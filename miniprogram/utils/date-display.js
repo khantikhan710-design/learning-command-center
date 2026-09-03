@@ -1,5 +1,6 @@
 function formatRecordDate(value) {
-  const date = new Date(value);
+  const source = String(value || '').replace(/(GMT[+-]\d{4})\s+CST\b/i, '$1');
+  const date = new Date(source);
   if (Number.isNaN(date.getTime())) return String(value || '未记录时间');
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
