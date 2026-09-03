@@ -1,6 +1,7 @@
 const cloudStore = require('../../utils/cloud-store');
 const { mergeCategories, buildFolders } = require('../../utils/study-folders');
 const { getPreviewUrls, currentPreviewUrl } = require('../../utils/evidence-links');
+const { formatRecordDate } = require('../../utils/date-display');
 const defaults = ['考研数学', '专业基础', '硬件电路', '英语', 'AI学习'];
 const sort = records => [...records].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 
@@ -13,7 +14,7 @@ Page({
     cloudStore.loadSnapshot('records').then(records => records && this.setRecords(records)).catch(() => {});
   },
   setRecords(records) {
-    records = sort(records);
+    records = sort(records).map(record => ({ ...record, displayDate: formatRecordDate(record.date) }));
     wx.setStorageSync('studyRecords', records);
     this.setData({ records, folders: buildFolders(records, this.data.categories) });
   },
@@ -58,5 +59,16 @@ Page({
       wx.previewImage({ current: currentPreviewUrl(result.fileList, current) || urls[0], urls, showmenu: true });
     }, fail: () => wx.showToast({ title: '图片暂时无法读取', icon: 'none' }) });
   },
-  openFile(e) { const file = e.currentTarget.dataset.f; wx.cloud.downloadFile({ fileID: file.cloudFileID, success: result => wx.openDocument({ filePath: result.tempFilePath, showMenu: true }) }); }
+  copyRecordText(e) { wx.setClipboardData({ data: e.currentTarget.dataset.text || '', success: () => wx.showToast({ title: '文字已复制', icon: 'success' }) }); },
+  fileActions(e) {
+    const file = e.currentTarget.dataset.f;
+    wx.showActionSheet({ itemList: ['打开、转发或用其他应用', '复制文件名'], success: result => {
+      if (result.tapIndex === 0) this.openFile(file);
+      if (result.tapIndex === 1) wx.setClipboardData({ data: file.name || '', success: () => wx.showToast({ title: '文件名已复制', icon: 'success' }) });
+    }});
+  },
+  openFile(eventOrFile) {
+    const file = eventOrFile.cloudFileID ? eventOrFile : eventOrFile.currentTarget.dataset.f;
+    wx.cloud.downloadFile({ fileID: file.cloudFileID, success: result => wx.openDocument({ filePath: result.tempFilePath, showMenu: true }) });
+  }
 });

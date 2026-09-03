@@ -1,21 +1,31 @@
 const cloudStore = require('../../utils/cloud-store');
 const { nextReview } = require('../../utils/spaced-repetition');
-const { buildFolders, markMastered, unmarkMastered } = require('../../utils/study-folders');
+const { mergeCategories, buildFolders, markMastered, unmarkMastered } = require('../../utils/study-folders');
 const { buildPrompts } = require('../../utils/review-prompts');
-const types = ['错题', '概念', '硬件设计', 'AI想法'];
+const defaultCategories = ['错题', '概念', '硬件设计', 'AI想法'];
 
 Page({
-  data: { type: '错题', content: '', items: [], folders: [], mastered: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [] },
+  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [] },
   onShow() {
+    this.setData({ categories: wx.getStorageSync('reviewCategories') || defaultCategories });
     this.setItems(wx.getStorageSync('reviewItems') || []);
     cloudStore.loadSnapshot('reviews').then(items => items && this.setItems(items)).catch(() => {});
   },
   setItems(items) {
     wx.setStorageSync('reviewItems', items);
-    this.setData({ items, folders: buildFolders(items, types, 'type'), mastered: items.filter(item => item.mastered) });
+    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered) });
   },
   persist(items) { this.setItems(items); cloudStore.saveSnapshot('reviews', items).catch(() => {}); },
   pick(e) { this.setData({ type: e.currentTarget.dataset.t }); },
+  addCategory() {
+    wx.showModal({ title: '新增复盘分类', editable: true, placeholderText: '例如：信号与系统', success: result => {
+      const categories = mergeCategories(this.data.categories, result.content);
+      if (categories.length === this.data.categories.length) return;
+      wx.setStorageSync('reviewCategories', categories);
+      this.setData({ categories, type: categories[categories.length - 1] });
+      this.setItems(this.data.items);
+    }});
+  },
   input(e) { this.setData({ content: e.detail.value }); },
   toggleFolder(e) { const name = e.currentTarget.dataset.n; this.setData({ [`open.${name}`]: !this.data.open[name] }); },
   toggleMastered() { this.setData({ openMastered: !this.data.openMastered }); },

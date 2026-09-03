@@ -1,5 +1,14 @@
 function sortTasks(tasks) {
-  return [...tasks].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+  return [...tasks].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || (a.order || 0) - (b.order || 0));
+}
+
+function ensureTaskOrder(tasks) {
+  return tasks.map((task, index) => Number.isFinite(task.order) ? task : { ...task, order: index });
+}
+
+function nextTopOrder(tasks) {
+  const orders = tasks.map(task => Number.isFinite(task.order) ? task.order : 0);
+  return Math.min(0, ...orders) - 1;
 }
 
 function updateTask(tasks, id, patch) {
@@ -10,4 +19,4 @@ function removeTask(tasks, id) {
   return tasks.filter(task => task.id !== id);
 }
 
-module.exports = { sortTasks, updateTask, removeTask };
+module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask };
