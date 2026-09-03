@@ -2,6 +2,7 @@ const cloudStore = require('../../utils/cloud-store');
 const { nextReview } = require('../../utils/spaced-repetition');
 const { mergeCategories, buildFolders, markMastered, unmarkMastered } = require('../../utils/study-folders');
 const { buildPrompts } = require('../../utils/review-prompts');
+const { removeReview } = require('../../utils/review-actions');
 const defaultCategories = ['错题', '概念', '硬件设计', 'AI想法'];
 
 Page({
@@ -54,5 +55,11 @@ Page({
     const id = e.currentTarget.dataset.id;
     this.persist(unmarkMastered(this.data.items, id));
     wx.showToast({ title: '已恢复到复盘队列', icon: 'success' });
+  },
+  remove(e) {
+    const id = e.currentTarget.dataset.id;
+    wx.showModal({ title: '删除复盘？', content: '删除后无法恢复。', confirmColor: '#e65050', success: result => {
+      if (result.confirm) this.persist(removeReview(this.data.items, id));
+    }});
   }
 });
