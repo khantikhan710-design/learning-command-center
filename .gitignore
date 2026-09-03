@@ -1,0 +1,12 @@
+# WeChat DevTools machine-specific configuration
+project.private.config.json
+
+# Local agent and editor state
+.superpowers/
+.vscode/
+
+# Generated output and logs
+node_modules/
+*.log
+dist/
+build/

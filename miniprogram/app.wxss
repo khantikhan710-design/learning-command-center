@@ -1,0 +1,1 @@
+page{background:#f4f7fb;color:#172b4d}.page{padding:28rpx 28rpx 120rpx}.card{background:#fff;border-radius:24rpx;padding:28rpx;margin-bottom:22rpx;box-shadow:0 10rpx 30rpx rgba(20,52,86,.07)}.primary{background:#1677ff;color:#fff;border-radius:16rpx;font-weight:600}.input{background:#f5f7fa;border-radius:14rpx;padding:20rpx;margin:16rpx 0;font-size:28rpx}

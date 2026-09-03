@@ -1,0 +1,19 @@
+<view class="page">
+  <view class="card"><view class="title">艾宾浩斯复习</view><view class="muted">按 1、2、4、7、15、30 天节奏复习。</view><view class="types"><block wx:for="{{['错题','概念','硬件设计','AI想法']}}" wx:key="*this"><text class="pill {{type===item?'selected':''}}" data-t="{{item}}" bindtap="pick">{{item}}</text></block></view><textarea class="input note" value="{{content}}" placeholder="写下需要复习的内容……" bindinput="input"/><button class="primary" bindtap="save">加入复习队列</button></view>
+  <view class="section">复盘收藏夹</view>
+  <block wx:for="{{folders}}" wx:key="name">
+    <view class="card folder">
+      <view class="folder-head" data-n="{{item.name}}" bindtap="toggleFolder">📁 {{item.name}}（{{item.count}}）<text>{{open[item.name]?'收起':'展开'}}</text></view>
+      <block wx:if="{{open[item.name]}}">
+        <block wx:for="{{item.items}}" wx:for-item="review" wx:key="id">
+          <view class="review-item"><view>{{review.content}}</view><view class="muted">第 {{review.stage}} 次 · 下次 {{review.next}}</view><view class="buttons"><button size="mini" data-id="{{review.id}}" bindtap="review">复习完成</button><button size="mini" data-id="{{review.id}}" bindtap="showPrompts">举一反三</button><button size="mini" data-id="{{review.id}}" bindtap="done">掌握</button></view><view wx:if="{{activePromptId===review.id}}" class="prompt-box"><view class="prompt-title">离线举一反三</view><block wx:for="{{activePrompts}}" wx:key="*this"><view class="prompt">{{item}}</view></block></view></view>
+        </block>
+      </block>
+    </view>
+  </block>
+  <view wx:if="{{mastered.length}}" class="section">已复习（{{mastered.length}}）</view>
+  <view wx:if="{{mastered.length}}" class="card folder mastered-folder">
+    <view class="folder-head" bindtap="toggleMastered">📁 已复习 <text>{{openMastered?'收起':'展开'}}</text></view>
+    <block wx:if="{{openMastered}}"><block wx:for="{{mastered}}" wx:key="id"><view class="review-item mastered"><view>{{item.content}}</view><view class="muted">已掌握 · {{item.masteredAt}}</view><button size="mini" class="undo" data-id="{{item.id}}" bindtap="undoDone">取消掌握</button></view></block></block>
+  </view>
+</view>

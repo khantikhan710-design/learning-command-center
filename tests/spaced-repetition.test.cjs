@@ -1,0 +1,1 @@
+const assert=require('node:assert/strict');const{nextReview}=require('../miniprogram/utils/spaced-repetition');const r=nextReview(0,new Date('2026-09-03T00:00:00'));assert.equal(r.stage,1);assert.equal(r.next,'2026/9/4');console.log('spaced repetition tests passed');
