@@ -1,7 +1,7 @@
 const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
 const { buildCategoryMenu } = require('../../utils/category-menu');
-const { parseGoalHours, formatGoalMinutes } = require('../../utils/goal-time');
+const { formatGoalMinutes, goalMinutesFromPicker, goalPickerValue } = require('../../utils/goal-time');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -9,9 +9,13 @@ const {
 
 Page({
   data: {
-    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', progress: 0, streak: 0,
+    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0,
     newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES,
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
+  },
+
+  onLoad() {
+    this.setData({ goalHourOptions: Array.from({ length: 25 }, (_, index) => String(index).padStart(2, '0')) });
   },
 
   onShow() {
@@ -53,7 +57,7 @@ Page({
     }
     this.setData({
       tasks, pendingTasks: pending, completedTasks: completed, categories, total: tasks.length, completed: completed.length,
-      completedMinutes, focusMinutes, goalMinutes, goalLabel: formatGoalMinutes(goalMinutes), streak,
+      completedMinutes, focusMinutes, goalMinutes, goalLabel: formatGoalMinutes(goalMinutes), goalPickerValue: goalPickerValue(goalMinutes), streak,
       progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100))
     });
   },
@@ -215,18 +219,16 @@ Page({
   },
 
   editGoal() {
-    wx.showModal({
-      title: '修改每日学习目标', content: '请输入 0.5 到 24 之间的小时数，例如 6 或 1.5。', editable: true,
-      placeholderText: `当前：${this.data.goalMinutes / 60}`,
-      success: result => {
-        if (!result.confirm) return;
-        const minutes = parseGoalHours(result.content);
-        if (!minutes) return wx.showToast({ title: '请输入 0.5 到 24 小时', icon: 'none' });
-        wx.setStorageSync('dailyGoalMinutes', minutes);
-        this.load();
-        wx.showToast({ title: '每日目标已更新', icon: 'success' });
-      }
-    });
+    this.setData({ goalPickerOpen: !this.data.goalPickerOpen });
+  },
+
+  goalPickerChange(e) {
+    const [hourIndex, minuteIndex] = e.detail.value;
+    const minutes = goalMinutesFromPicker(this.data.goalHourOptions[hourIndex], this.data.goalMinuteOptions[minuteIndex]);
+    if (!minutes) return wx.showToast({ title: '每日目标至少 30 分钟', icon: 'none' });
+    wx.setStorageSync('dailyGoalMinutes', minutes);
+    this.setData({ goalMinutes: minutes, goalLabel: formatGoalMinutes(minutes), goalPickerValue: [hourIndex, minuteIndex] });
+    this.load();
   },
 
   goFocus() {
