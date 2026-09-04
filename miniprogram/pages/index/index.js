@@ -1,4 +1,4 @@
-const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask } = require('../../utils/task-actions');
+const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
 const { buildCategoryMenu } = require('../../utils/category-menu');
 const {
@@ -58,7 +58,9 @@ Page({
     const cleanCategories = normalizeTaskCategories(categories);
     wx.setStorageSync('studyTasks', sorted);
     wx.setStorageSync('studyTaskCategories', cleanCategories);
-    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories }).catch(() => {});
+    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories })
+      .then(() => console.info('[cloud-sync] tasks saved'))
+      .catch(error => console.error('[cloud-sync] task save failed', error));
     this.setData({ activeTaskId: '' });
     this.load();
   },
@@ -72,7 +74,7 @@ Page({
       const dates = wx.getStorageSync('studyActiveDates') || [];
       if (!dates.includes(today)) wx.setStorageSync('studyActiveDates', [...dates, today]);
     }
-    this.persist(updateTask(this.data.tasks, id, { done: !task.done }));
+    this.persist(toggleTaskDone(this.data.tasks, id));
   },
 
   changeDuration(e) {
@@ -202,10 +204,10 @@ Page({
   addTask() {
     const title = this.data.newTask.trim();
     if (!title) return wx.showToast({ title: '先写下任务内容', icon: 'none' });
-    this.persist([...this.data.tasks, {
+    this.persist(createTask(this.data.tasks, {
       id: String(Date.now()), title, subject: UNCATEGORIZED, minutes: null, done: false, pinned: false,
       order: nextTopOrder(this.data.tasks)
-    }]);
+    }));
     this.setData({ newTask: '' });
   },
 

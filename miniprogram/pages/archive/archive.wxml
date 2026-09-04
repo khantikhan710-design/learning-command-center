@@ -3,9 +3,11 @@
   <view wx:if="{{!folders.length}}" class="card empty">还没有可归档的学习内容。</view>
   <block wx:for="{{folders}}" wx:key="key">
     <view class="card folder">
-      <view class="folder-head" data-key="{{item.key}}" bindtap="toggleFolder"><view><view class="month">📁 {{item.label}}</view><view class="muted">学习记录 {{item.recordCount}} 条 · 复盘 {{item.reviewCount}} 条</view></view><text>{{open[item.key]?'收起':'展开'}}</text></view>
+      <view class="folder-head" data-key="{{item.key}}" bindtap="toggleFolder"><view><view class="month">📁 {{item.label}}</view><view class="muted">学习记录 {{item.recordCount}} 条 · 复盘 {{item.reviewCount}} 条 · 任务 {{item.taskCount}} 项</view></view><text>{{open[item.key]?'收起':'展开'}}</text></view>
       <block wx:if="{{open[item.key]}}">
-        <button size="mini" class="copy-summary" data-key="{{item.key}}" bindtap="copySummary">复制本月摘要</button>
+        <view class="export-actions"><button size="mini" class="copy-summary" data-key="{{item.key}}" bindtap="copySummary">复制本月摘要</button><button size="mini" class="copy-obsidian" data-key="{{item.key}}" bindtap="copyObsidian">复制到 Obsidian</button></view>
+        <view wx:if="{{item.tasks.length}}" class="subhead">任务</view>
+        <block wx:for="{{item.tasks}}" wx:for-item="task" wx:key="id"><view class="entry"><view class="entry-meta">{{task.subject || '未分类'}} · {{task.statusLabel}}</view><view>{{task.done ? '✓ ' : ''}}{{task.title}}</view></view></block>
         <view wx:if="{{item.records.length}}" class="subhead">学习记录</view>
         <block wx:for="{{item.records}}" wx:for-item="record" wx:key="id"><view class="entry"><view class="entry-meta">{{record.displayDate}} · {{record.subject || '未分类'}}</view><view>{{record.content || '图片或文件附件记录'}}</view></view></block>
         <view wx:if="{{item.reviews.length}}" class="subhead">复盘条目</view>

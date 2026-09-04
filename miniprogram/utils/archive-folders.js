@@ -9,20 +9,28 @@ function monthKey(value) {
   return `${lookup.year}-${lookup.month}`;
 }
 
-function buildMonthlyFolders(records, reviews) {
+function buildMonthlyFolders(records, reviews, tasks = []) {
   const buckets = {};
   const add = (key, field, item) => {
-    if (!buckets[key]) buckets[key] = { key, records: [], reviews: [] };
-    buckets[key][field].push(item);
+    if (!buckets[key]) buckets[key] = { key, records: [], reviews: [], tasks: [] };
+    if (!buckets[key][field].some(entry => entry.id === item.id)) buckets[key][field].push(item);
   };
   records.forEach(record => add(monthKey(record.date), 'records', record));
   reviews.forEach(review => add(monthKey(review.created || review.masteredAt), 'reviews', review));
+  tasks.forEach(task => {
+    const keys = [...new Set([task.createdAt, task.completedAt]
+      .filter(Boolean)
+      .map(monthKey)
+      .filter(key => key !== '未分类日期'))];
+    keys.forEach(key => add(key, 'tasks', task));
+  });
   return Object.values(buckets).sort((a, b) => b.key.localeCompare(a.key)).map(folder => ({
     ...folder,
     label: folder.key === '未分类日期' ? folder.key : `${folder.key.slice(0, 4)} 年 ${folder.key.slice(5)} 月`,
     recordCount: folder.records.length,
-    reviewCount: folder.reviews.length
+    reviewCount: folder.reviews.length,
+    taskCount: folder.tasks.length
   }));
 }
 
-module.exports = { buildMonthlyFolders };
+module.exports = { buildMonthlyFolders, monthKey };

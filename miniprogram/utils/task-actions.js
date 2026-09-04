@@ -19,4 +19,17 @@ function removeTask(tasks, id) {
   return tasks.filter(task => task.id !== id);
 }
 
-module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask };
+function createTask(tasks, task, now = new Date().toISOString()) {
+  return [...tasks, { ...task, createdAt: now }];
+}
+
+function toggleTaskDone(tasks, id, now = new Date().toISOString()) {
+  return tasks.map(task => {
+    if (task.id !== id) return task;
+    if (!task.done) return { ...task, done: true, completedAt: now };
+    const { completedAt, ...restored } = task;
+    return { ...restored, done: false };
+  });
+}
+
+module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone };
