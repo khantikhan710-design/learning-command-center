@@ -32,4 +32,11 @@ function toggleTaskDone(tasks, id, now = new Date().toISOString()) {
   });
 }
 
-module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone };
+function splitTasks(tasks) {
+  return {
+    pending: tasks.filter(task => !task.done),
+    completed: tasks.filter(task => task.done)
+  };
+}
+
+module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks };

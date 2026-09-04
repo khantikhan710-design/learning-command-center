@@ -1,4 +1,4 @@
-const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone } = require('../../utils/task-actions');
+const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
 const { buildCategoryMenu } = require('../../utils/category-menu');
 const {
@@ -8,7 +8,7 @@ const {
 
 Page({
   data: {
-    tasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, progress: 0, streak: 0,
+    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, progress: 0, streak: 0,
     newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES,
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
@@ -37,6 +37,7 @@ Page({
   load() {
     const { tasks: storedTasks, categories } = this.loadLocalState();
     const tasks = sortTasks(ensureTaskOrder(storedTasks));
+    const { pending, completed } = splitTasks(tasks);
     wx.setStorageSync('studyTasks', tasks);
     const completedMinutes = tasks.filter(x => x.done).reduce((n, x) => n + (x.minutes || 0), 0);
     const focusMinutes = wx.getStorageSync('focusMinutes') || 0;
@@ -48,7 +49,7 @@ Page({
       day.setDate(day.getDate() - 1);
     }
     this.setData({
-      tasks, categories, total: tasks.length, completed: tasks.filter(x => x.done).length,
+      tasks, pendingTasks: pending, completedTasks: completed, categories, total: tasks.length, completed: completed.length,
       completedMinutes, focusMinutes, streak, progress: Math.min(100, Math.round((focusMinutes / 360) * 100))
     });
   },
