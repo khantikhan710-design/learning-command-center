@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { sortTasks, updateTask, removeTask, ensureTaskOrder, createTask, toggleTaskDone, splitTasks } = require('../miniprogram/utils/task-actions');
+const { sortTasks, updateTask, removeTask, ensureTaskOrder, createTask, toggleTaskDone, splitTasks, reorderPendingTasks } = require('../miniprogram/utils/task-actions');
 
 const tasks = [{ id: 'a', pinned: false }, { id: 'b', pinned: true }, { id: 'c', pinned: false }];
 assert.deepEqual(sortTasks(tasks).map(x => x.id), ['b', 'a', 'c']);
@@ -24,4 +24,18 @@ assert.equal('completedAt' in reopened[0], false);
 const split = splitTasks([{ id: 'pending', done: false }, { id: 'finished', done: true }, { id: 'also-pending' }]);
 assert.deepEqual(split.pending.map(task => task.id), ['pending', 'also-pending']);
 assert.deepEqual(split.completed.map(task => task.id), ['finished']);
+
+const reordered = reorderPendingTasks([
+  { id: 'pinned-a', pinned: true, done: false, order: 0 },
+  { id: 'pinned-b', pinned: true, done: false, order: 1 },
+  { id: 'first', pinned: false, done: false, order: 0 },
+  { id: 'second', pinned: false, done: false, order: 1 },
+  { id: 'finished', pinned: false, done: true, order: 9 }
+], 'second', 'first');
+assert.deepEqual(sortTasks(reordered).map(task => task.id), ['pinned-a', 'pinned-b', 'second', 'first', 'finished']);
+assert.equal(reordered.find(task => task.id === 'finished').order, 9);
+assert.deepEqual(
+  reorderPendingTasks(reordered, 'second', 'pinned-a').map(task => task.id),
+  reordered.map(task => task.id)
+);
 console.log('task action tests passed');

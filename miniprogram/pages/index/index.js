@@ -1,10 +1,11 @@
-const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks } = require('../../utils/task-actions');
+const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks, reorderPendingTasks } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
 const { buildCategoryMenu } = require('../../utils/category-menu');
 const { formatGoalMinutes, goalMinutesFromPicker, goalPickerValue } = require('../../utils/goal-time');
 const { dueReviews, buildDailySummary } = require('../../utils/review-status');
 const { buildReviewCoach } = require('../../utils/review-coach');
 const { buildDailyPlan } = require('../../utils/daily-plan');
+const { getDailyInsight } = require('../../utils/daily-insights');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -13,7 +14,8 @@ const {
 Page({
   data: {
     tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0, reviewCoach: {},
-    newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
+    newTask: '', date: '', activeTaskId: '', touchStartX: 0, draggingTaskId: '', categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
+    insight: { type: '学习思考', title: '把注意力放回今天能完成的一步', content: '先完成一轮可验证的练习，再记录卡点。', source: '学习方法摘记' },
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
 
@@ -22,7 +24,11 @@ Page({
   },
 
   onShow() {
-    this.setData({ date: new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) });
+    const today = new Date();
+    this.setData({
+      date: today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }),
+      insight: getDailyInsight(today)
+    });
     this.load();
     cloudStore.loadTaskState().then(snapshot => {
       if (!snapshot) return;
@@ -100,7 +106,45 @@ Page({
     this.setData({ touchStartX: e.touches[0].clientX });
   },
 
+  onTaskLongPress(e) {
+    const id = e.currentTarget.dataset.id;
+    const task = this.data.tasks.find(item => item.id === id);
+    if (!task || task.done) return;
+    this.dragTasks = this.data.tasks;
+    this.dragChanged = false;
+    this.setData({ draggingTaskId: id, activeTaskId: '' });
+    wx.vibrateShort({ type: 'light' });
+    wx.createSelectorQuery().in(this).selectAll('.pending-task-card').boundingClientRect(rects => {
+      this.pendingTaskRects = rects || [];
+    }).exec();
+  },
+
+  onTaskTouchMove(e) {
+    if (!this.data.draggingTaskId || !this.pendingTaskRects || !e.touches.length) return;
+    const y = e.touches[0].clientY;
+    const targetIndex = this.pendingTaskRects.findIndex(rect => y >= rect.top && y <= rect.bottom);
+    const target = this.data.pendingTasks[targetIndex];
+    if (!target || target.id === this.data.draggingTaskId) return;
+    const reordered = reorderPendingTasks(this.dragTasks || this.data.tasks, this.data.draggingTaskId, target.id);
+    if (reordered === (this.dragTasks || this.data.tasks)) return;
+    this.dragTasks = reordered;
+    this.dragChanged = true;
+    const tasks = sortTasks(ensureTaskOrder(reordered));
+    const { pending, completed } = splitTasks(tasks);
+    this.setData({ tasks, pendingTasks: pending, completedTasks: completed });
+  },
+
   onTaskTouchEnd(e) {
+    if (this.data.draggingTaskId) {
+      const tasks = this.dragTasks || this.data.tasks;
+      const changed = this.dragChanged;
+      this.dragTasks = null;
+      this.dragChanged = false;
+      this.pendingTaskRects = null;
+      this.setData({ draggingTaskId: '', activeTaskId: '' });
+      if (changed) this.persist(tasks);
+      return;
+    }
     const delta = e.changedTouches[0].clientX - this.data.touchStartX;
     const id = e.currentTarget.dataset.id;
     if (delta < -50) this.setData({ activeTaskId: id });

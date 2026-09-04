@@ -39,4 +39,21 @@ function splitTasks(tasks) {
   };
 }
 
-module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks };
+function reorderPendingTasks(tasks, movingId, targetId) {
+  const moving = tasks.find(task => task.id === movingId);
+  const target = tasks.find(task => task.id === targetId);
+  if (!moving || !target || moving.done || target.done || Boolean(moving.pinned) !== Boolean(target.pinned)) return tasks;
+
+  const group = sortTasks(tasks).filter(task => !task.done && Boolean(task.pinned) === Boolean(moving.pinned));
+  const fromIndex = group.findIndex(task => task.id === movingId);
+  const toIndex = group.findIndex(task => task.id === targetId);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return tasks;
+
+  const reorderedGroup = [...group];
+  const [moved] = reorderedGroup.splice(fromIndex, 1);
+  reorderedGroup.splice(toIndex, 0, moved);
+  const orderById = new Map(reorderedGroup.map((task, index) => [task.id, index]));
+  return tasks.map(task => orderById.has(task.id) ? { ...task, order: orderById.get(task.id) } : task);
+}
+
+module.exports = { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks, reorderPendingTasks };
