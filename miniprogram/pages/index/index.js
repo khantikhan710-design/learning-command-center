@@ -1,6 +1,7 @@
 const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, createTask, toggleTaskDone, splitTasks } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
 const { buildCategoryMenu } = require('../../utils/category-menu');
+const { parseGoalHours, formatGoalMinutes } = require('../../utils/goal-time');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -8,7 +9,7 @@ const {
 
 Page({
   data: {
-    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, progress: 0, streak: 0,
+    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', progress: 0, streak: 0,
     newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES,
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
@@ -41,6 +42,8 @@ Page({
     wx.setStorageSync('studyTasks', tasks);
     const completedMinutes = tasks.filter(x => x.done).reduce((n, x) => n + (x.minutes || 0), 0);
     const focusMinutes = wx.getStorageSync('focusMinutes') || 0;
+    const storedGoal = wx.getStorageSync('dailyGoalMinutes');
+    const goalMinutes = Number.isFinite(storedGoal) && storedGoal > 0 ? storedGoal : 360;
     const dates = wx.getStorageSync('studyActiveDates') || [];
     let streak = 0;
     const day = new Date();
@@ -50,7 +53,8 @@ Page({
     }
     this.setData({
       tasks, pendingTasks: pending, completedTasks: completed, categories, total: tasks.length, completed: completed.length,
-      completedMinutes, focusMinutes, streak, progress: Math.min(100, Math.round((focusMinutes / 360) * 100))
+      completedMinutes, focusMinutes, goalMinutes, goalLabel: formatGoalMinutes(goalMinutes), streak,
+      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100))
     });
   },
 
@@ -59,9 +63,7 @@ Page({
     const cleanCategories = normalizeTaskCategories(categories);
     wx.setStorageSync('studyTasks', sorted);
     wx.setStorageSync('studyTaskCategories', cleanCategories);
-    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories })
-      .then(() => console.info('[cloud-sync] tasks saved'))
-      .catch(error => console.error('[cloud-sync] task save failed', error));
+    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories }).catch(() => {});
     this.setData({ activeTaskId: '' });
     this.load();
   },
@@ -210,6 +212,21 @@ Page({
       order: nextTopOrder(this.data.tasks)
     }));
     this.setData({ newTask: '' });
+  },
+
+  editGoal() {
+    wx.showModal({
+      title: '修改每日学习目标', content: '请输入 0.5 到 24 之间的小时数，例如 6 或 1.5。', editable: true,
+      placeholderText: `当前：${this.data.goalMinutes / 60}`,
+      success: result => {
+        if (!result.confirm) return;
+        const minutes = parseGoalHours(result.content);
+        if (!minutes) return wx.showToast({ title: '请输入 0.5 到 24 小时', icon: 'none' });
+        wx.setStorageSync('dailyGoalMinutes', minutes);
+        this.load();
+        wx.showToast({ title: '每日目标已更新', icon: 'success' });
+      }
+    });
   },
 
   goFocus() {
