@@ -4,6 +4,7 @@ const { buildCategoryMenu } = require('../../utils/category-menu');
 const { formatGoalMinutes, goalMinutesFromPicker, goalPickerValue } = require('../../utils/goal-time');
 const { dueReviews, buildDailySummary } = require('../../utils/review-status');
 const { buildReviewCoach } = require('../../utils/review-coach');
+const { buildDailyPlan } = require('../../utils/daily-plan');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -12,7 +13,7 @@ const {
 Page({
   data: {
     tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0, reviewCoach: {},
-    newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES,
+    newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
 
@@ -53,6 +54,7 @@ Page({
     const reviewCoach = buildReviewCoach({ activityDates: wx.getStorageSync('reviewActiveDates') || [], dueCount: dueItems.length, reviewCount: reviewItems.length });
     const storedGoal = wx.getStorageSync('dailyGoalMinutes');
     const goalMinutes = Number.isFinite(storedGoal) && storedGoal > 0 ? storedGoal : 360;
+    const dailyPlan = buildDailyPlan({ tasks, dueItems, focusMinutes, goalMinutes });
     const dates = wx.getStorageSync('studyActiveDates') || [];
     let streak = 0;
     const day = new Date();
@@ -63,7 +65,7 @@ Page({
     this.setData({
       tasks, pendingTasks: pending, completedTasks: completed, categories, total: tasks.length, completed: completed.length,
       completedMinutes, focusMinutes, goalMinutes, goalLabel: formatGoalMinutes(goalMinutes), goalPickerValue: goalPickerValue(goalMinutes), streak,
-      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100)), dueItems, dueReviewCount: dueItems.length, reviewCoach
+      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100)), dueItems, dueReviewCount: dueItems.length, reviewCoach, dailyPlan
     });
   },
 
@@ -253,5 +255,12 @@ Page({
 
   goFocus() {
     wx.switchTab({ url: '/pages/focus/focus' });
+  },
+
+  goNext() {
+    const action = this.data.dailyPlan.action || {};
+    if (action.kind === 'review') return this.goReview();
+    if (action.kind === 'task') wx.setStorageSync('focusPrefillTaskId', action.taskId);
+    this.goFocus();
   }
 });
