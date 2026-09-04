@@ -2,7 +2,7 @@ const { toSeconds, fromSeconds } = require('../../utils/timer');
 const { beginExit, returnFromBreak, formatElapsed } = require('../../utils/focus-guard');
 const cloudStore = require('../../utils/cloud-store');
 const { buildFocusAttribution } = require('../../utils/focus-attribution');
-const { startSession, remainingSeconds, pauseSession, resumeSession, shouldFinish } = require('../../utils/focus-session');
+const { startSession, remainingSeconds, pauseSession, resumeSession, resetSession, shouldFinish } = require('../../utils/focus-session');
 const pad = n => String(n).padStart(2, '0');
 Page({
   data:{minutes:25,seconds:0,running:false,label:'设置你的专注时长',today:0,timer:null,minuteOptions:[],secondOptions:[],pickerValue:[25,0],initialSeconds:1500,strict:false,breaksLeft:3,onBreak:false,breakSeconds:0,breakTimer:null,lastUnexpectedLeave:0,breakStartAt:0,lastBreakText:'',subjectOptions:['未分类'],taskOptions:[{id:'',title:'不关联具体任务',subject:''}],subjectIndex:0,taskIndex:0,selectedSubject:'未分类',selectedTaskId:'',selectedTaskTitle:''},
@@ -53,6 +53,15 @@ Page({
     this.stopTicker();
     if(session&&session.running)this.persistSession(pauseSession(session));
     this.setData({running:false,label:'已暂停'});
+  },
+  reset(){
+    const session=this.data.sessionState||wx.getStorageSync('focusTimerState');
+    if(!session)return;
+    wx.showModal({title:'重置本轮专注？',content:'本轮不会计入专注时长，将恢复为开始前设定的时间。',confirmText:'重置',confirmColor:'#e65050',success:result=>{
+      if(!result.confirm)return;
+      this.stopTicker();wx.removeStorageSync('focusTimerState');
+      this.setData({...resetSession(session),sessionState:null,running:false,label:'已重置，可重新开始'});
+    }});
   },
   tickBreak(){const remain=Math.max(0,Math.ceil((this.data.breakEndsAt-Date.now())/1000));this.setData({breakSeconds:remain});if(remain===0)this.endBreak()},
   stopBreak(){if(this.data.breakTimer){clearInterval(this.data.breakTimer);this.data.breakTimer=null}},

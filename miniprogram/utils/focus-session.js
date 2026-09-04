@@ -22,4 +22,11 @@ function shouldFinish(session, now = Date.now()) {
   return Boolean(session && session.running && remainingSeconds(session, now) === 0);
 }
 
-module.exports = { startSession, remainingSeconds, pauseSession, resumeSession, shouldFinish };
+function resetSession(session) {
+  const seconds = Math.max(0, Number(session && session.initialSeconds) || 0);
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return { minutes, seconds: remain, pickerValue: [minutes, remain] };
+}
+
+module.exports = { startSession, remainingSeconds, pauseSession, resumeSession, resetSession, shouldFinish };
