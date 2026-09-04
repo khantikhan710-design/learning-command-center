@@ -6,6 +6,7 @@ const { dueReviews, buildDailySummary } = require('../../utils/review-status');
 const { buildReviewCoach } = require('../../utils/review-coach');
 const { buildDailyPlan } = require('../../utils/daily-plan');
 const { getDailyInsight } = require('../../utils/daily-insights');
+const { getTaskDragState } = require('../../utils/task-drag');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -14,7 +15,7 @@ const {
 Page({
   data: {
     tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0, reviewCoach: {},
-    newTask: '', date: '', activeTaskId: '', touchStartX: 0, draggingTaskId: '', categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
+    newTask: '', date: '', activeTaskId: '', touchStartX: 0, draggingTaskId: '', dragTargetId: '', dragOffsetY: 0, categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
     insight: { type: '学习思考', title: '把注意力放回今天能完成的一步', content: '先完成一轮可验证的练习，再记录卡点。', source: '学习方法摘记' },
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
@@ -111,8 +112,9 @@ Page({
     const task = this.data.tasks.find(item => item.id === id);
     if (!task || task.done) return;
     this.dragTasks = this.data.tasks;
-    this.dragChanged = false;
-    this.setData({ draggingTaskId: id, activeTaskId: '' });
+    const touch = e.touches[0] || e.changedTouches[0];
+    this.dragStartY = touch ? touch.clientY : 0;
+    this.setData({ draggingTaskId: id, dragTargetId: id, dragOffsetY: 0, activeTaskId: '' });
     wx.vibrateShort({ type: 'light' });
     wx.createSelectorQuery().in(this).selectAll('.pending-task-card').boundingClientRect(rects => {
       this.pendingTaskRects = rects || [];
@@ -121,27 +123,25 @@ Page({
 
   onTaskTouchMove(e) {
     if (!this.data.draggingTaskId || !this.pendingTaskRects || !e.touches.length) return;
-    const y = e.touches[0].clientY;
-    const targetIndex = this.pendingTaskRects.findIndex(rect => y >= rect.top && y <= rect.bottom);
-    const target = this.data.pendingTasks[targetIndex];
-    if (!target || target.id === this.data.draggingTaskId) return;
-    const reordered = reorderPendingTasks(this.dragTasks || this.data.tasks, this.data.draggingTaskId, target.id);
-    if (reordered === (this.dragTasks || this.data.tasks)) return;
-    this.dragTasks = reordered;
-    this.dragChanged = true;
-    const tasks = sortTasks(ensureTaskOrder(reordered));
-    const { pending, completed } = splitTasks(tasks);
-    this.setData({ tasks, pendingTasks: pending, completedTasks: completed });
+    const drag = getTaskDragState({
+      startY: this.dragStartY,
+      currentY: e.touches[0].clientY,
+      rectangles: this.pendingTaskRects,
+      tasks: this.data.pendingTasks
+    });
+    if (drag.targetId === this.data.dragTargetId && Math.abs(drag.offsetY - this.data.dragOffsetY) < 8) return;
+    this.setData({ dragTargetId: drag.targetId, dragOffsetY: drag.offsetY });
   },
 
   onTaskTouchEnd(e) {
     if (this.data.draggingTaskId) {
-      const tasks = this.dragTasks || this.data.tasks;
-      const changed = this.dragChanged;
+      const originalTasks = this.dragTasks || this.data.tasks;
+      const tasks = reorderPendingTasks(originalTasks, this.data.draggingTaskId, this.data.dragTargetId);
+      const changed = tasks !== originalTasks;
       this.dragTasks = null;
-      this.dragChanged = false;
+      this.dragStartY = null;
       this.pendingTaskRects = null;
-      this.setData({ draggingTaskId: '', activeTaskId: '' });
+      this.setData({ draggingTaskId: '', dragTargetId: '', dragOffsetY: 0, activeTaskId: '' });
       if (changed) this.persist(tasks);
       return;
     }
