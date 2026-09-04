@@ -5,10 +5,12 @@ const { buildPrompts } = require('../../utils/review-prompts');
 const { removeReview } = require('../../utils/review-actions');
 const { dueReviews } = require('../../utils/review-status');
 const { recordReviewDay, buildReviewCoach } = require('../../utils/review-coach');
+const { buildReviewCurve, selectCurveItem } = require('../../utils/review-curve');
 const defaultCategories = ['错题', '概念', '硬件设计', 'AI想法'];
 
 Page({
-  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], dueItems: [], duePreview: [], coach: {}, open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
+  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], dueItems: [], duePreview: [], coach: {}, curve: null, open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
+  onReady() { this.drawCurve(); },
   onShow() {
     this.setData({ categories: wx.getStorageSync('reviewCategories') || defaultCategories });
     this.setItems(wx.getStorageSync('reviewItems') || []);
@@ -23,7 +25,56 @@ Page({
     wx.setStorageSync('reviewItems', items);
     const dueItems = dueReviews(items);
     const coach = buildReviewCoach({ activityDates: wx.getStorageSync('reviewActiveDates') || [], dueCount: dueItems.length, reviewCount: items.length });
-    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered), dueItems, duePreview: dueItems.slice(0, 3), coach });
+    const curveItem = selectCurveItem(items, dueItems);
+    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered), dueItems, duePreview: dueItems.slice(0, 3), coach, curve: curveItem ? buildReviewCurve(curveItem) : null });
+    wx.nextTick(() => this.drawCurve());
+  },
+  drawCurve() {
+    const curve = this.data.curve;
+    if (!curve) return;
+    wx.createSelectorQuery().in(this).select('#review-curve').fields({ node: true, size: true }).exec(result => {
+      const target = result && result[0];
+      if (!target || !target.node || !target.width || !target.height) return;
+      const canvas = target.node;
+      const context = canvas.getContext('2d');
+      const ratio = wx.getSystemInfoSync().pixelRatio || 1;
+      canvas.width = target.width * ratio;
+      canvas.height = target.height * ratio;
+      context.scale(ratio, ratio);
+      const width = target.width;
+      const height = target.height;
+      const padding = { left: 28, right: 12, top: 16, bottom: 26 };
+      const chartWidth = width - padding.left - padding.right;
+      const chartHeight = height - padding.top - padding.bottom;
+      context.clearRect(0, 0, width, height);
+      context.strokeStyle = '#dfe8f2';
+      context.lineWidth = 1;
+      context.setLineDash([3, 4]);
+      [25, 50, 75].forEach(percent => {
+        const y = padding.top + chartHeight * (1 - percent / 100);
+        context.beginPath(); context.moveTo(padding.left, y); context.lineTo(width - padding.right, y); context.stroke();
+      });
+      context.setLineDash([]);
+      context.strokeStyle = '#9eafc1';
+      context.beginPath(); context.moveTo(padding.left, padding.top); context.lineTo(padding.left, height - padding.bottom); context.lineTo(width - padding.right, height - padding.bottom); context.stroke();
+      context.strokeStyle = '#1677ff';
+      context.lineWidth = 2.5;
+      curve.points.forEach((point, index) => {
+        const x = padding.left + chartWidth * point.day / 30;
+        const y = padding.top + chartHeight * (1 - point.retention / 100);
+        if (index === 0) context.beginPath(), context.moveTo(x, y); else context.lineTo(x, y);
+      });
+      context.stroke();
+      curve.milestones.forEach(node => {
+        const x = padding.left + chartWidth * node.day / 30;
+        const point = curve.points[node.day];
+        const y = padding.top + chartHeight * (1 - point.retention / 100);
+        context.fillStyle = node.status === 'done' ? '#1677ff' : node.status === 'current' ? '#f2994a' : '#b4c0ce';
+        context.beginPath(); context.arc(x, y, node.status === 'current' ? 5 : 4, 0, Math.PI * 2); context.fill();
+      });
+      context.fillStyle = '#7890a7'; context.font = '10px sans-serif';
+      context.fillText('今天', padding.left - 3, height - 8); context.fillText('30 天', width - padding.right - 25, height - 8);
+    });
   },
   persist(items) { this.setItems(items); cloudStore.saveSnapshot('reviews', items).catch(() => {}); },
   recordActivity() {
