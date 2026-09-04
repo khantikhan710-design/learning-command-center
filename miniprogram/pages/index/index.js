@@ -1,19 +1,204 @@
 const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
+const {
+  DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
+  normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
+} = require('../../utils/task-categories');
 
 Page({
-  data:{tasks:[],completed:0,total:0,completedMinutes:0,focusMinutes:0,progress:0,streak:0,newTask:'',date:'',activeTaskId:'',touchStartX:0,categories:['考研数学','专业基础','硬件电路','英语','AI 学习','自定义'],durationOptions:[15,20,25,30,40,45,50,60,75,90,120,150,180,240]},
-  onShow(){this.setData({date:new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'})});this.load();cloudStore.loadSnapshot('tasks').then(items=>{if(items){wx.setStorageSync('studyTasks',items);this.load()}}).catch(()=>{})},
-  load(){const tasks=sortTasks(ensureTaskOrder(wx.getStorageSync('studyTasks')||[]));wx.setStorageSync('studyTasks',tasks);const completedMinutes=tasks.filter(x=>x.done).reduce((n,x)=>n+(x.minutes||0),0);const focusMinutes=wx.getStorageSync('focusMinutes')||0;const dates=wx.getStorageSync('studyActiveDates')||[];let streak=0;let d=new Date();while(dates.includes(d.toLocaleDateString('zh-CN'))){streak++;d.setDate(d.getDate()-1)}this.setData({tasks,total:tasks.length,completed:tasks.filter(x=>x.done).length,completedMinutes,focusMinutes,streak,progress:Math.min(100,Math.round((focusMinutes/360)*100))})},
-  persist(tasks){const sorted=sortTasks(ensureTaskOrder(tasks));wx.setStorageSync('studyTasks',sorted);cloudStore.saveSnapshot('tasks',sorted).catch(()=>{});this.setData({activeTaskId:''});this.load()},
-  toggle(e){const id=e.currentTarget.dataset.id;const task=this.data.tasks.find(x=>x.id===id);if(!task.done){const today=new Date().toLocaleDateString('zh-CN');const dates=wx.getStorageSync('studyActiveDates')||[];if(!dates.includes(today))wx.setStorageSync('studyActiveDates',[...dates,today])}this.persist(updateTask(this.data.tasks,id,{done:!task.done}))},
-  changeDuration(e){const id=e.currentTarget.dataset.id;this.persist(updateTask(this.data.tasks,id,{minutes:this.data.durationOptions[Number(e.detail.value)]}))},
-  onTaskTouchStart(e){this.setData({touchStartX:e.touches[0].clientX})},
-  onTaskTouchEnd(e){const delta=e.changedTouches[0].clientX-this.data.touchStartX;const id=e.currentTarget.dataset.id;if(delta<-50)this.setData({activeTaskId:id});if(delta>50)this.setData({activeTaskId:''})},
-  togglePin(e){const id=e.currentTarget.dataset.id;const task=this.data.tasks.find(x=>x.id===id);this.persist(updateTask(this.data.tasks,id,{pinned:!task.pinned}))},
-  chooseCategory(e){const id=e.currentTarget.dataset.id;wx.showActionSheet({itemList:this.data.categories,success:r=>this.persist(updateTask(this.data.tasks,id,{subject:this.data.categories[r.tapIndex]}))})},
-  confirmDelete(e){const id=e.currentTarget.dataset.id;wx.showModal({title:'删除任务？',content:'删除后无法恢复。',confirmColor:'#e65050',success:r=>{if(r.confirm)this.persist(removeTask(this.data.tasks,id))}})},
-  setNewTask(e){this.setData({newTask:e.detail.value})},
-  addTask(){const title=this.data.newTask.trim();if(!title)return wx.showToast({title:'先写下任务内容',icon:'none'});this.persist([...this.data.tasks,{id:String(Date.now()),title,subject:'自定义',minutes:null,done:false,pinned:false,order:nextTopOrder(this.data.tasks)}]);this.setData({newTask:''})},
-  goFocus(){wx.switchTab({url:'/pages/focus/focus'})}
-})
+  data: {
+    tasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, progress: 0, streak: 0,
+    newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES,
+    durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
+  },
+
+  onShow() {
+    this.setData({ date: new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) });
+    this.load();
+    cloudStore.loadTaskState().then(snapshot => {
+      if (!snapshot) return;
+      const state = Array.isArray(snapshot) ? { tasks: snapshot, categories: wx.getStorageSync('studyTaskCategories') } : snapshot;
+      if (!Array.isArray(state.tasks)) return;
+      wx.setStorageSync('studyTasks', normalizeTaskSubjects(state.tasks));
+      wx.setStorageSync('studyTaskCategories', normalizeTaskCategories(state.categories));
+      this.load();
+    }).catch(() => {});
+  },
+
+  loadLocalState() {
+    const tasks = normalizeTaskSubjects(wx.getStorageSync('studyTasks') || []);
+    const categories = normalizeTaskCategories(wx.getStorageSync('studyTaskCategories'));
+    wx.setStorageSync('studyTasks', tasks);
+    wx.setStorageSync('studyTaskCategories', categories);
+    return { tasks, categories };
+  },
+
+  load() {
+    const { tasks: storedTasks, categories } = this.loadLocalState();
+    const tasks = sortTasks(ensureTaskOrder(storedTasks));
+    wx.setStorageSync('studyTasks', tasks);
+    const completedMinutes = tasks.filter(x => x.done).reduce((n, x) => n + (x.minutes || 0), 0);
+    const focusMinutes = wx.getStorageSync('focusMinutes') || 0;
+    const dates = wx.getStorageSync('studyActiveDates') || [];
+    let streak = 0;
+    const day = new Date();
+    while (dates.includes(day.toLocaleDateString('zh-CN'))) {
+      streak++;
+      day.setDate(day.getDate() - 1);
+    }
+    this.setData({
+      tasks, categories, total: tasks.length, completed: tasks.filter(x => x.done).length,
+      completedMinutes, focusMinutes, streak, progress: Math.min(100, Math.round((focusMinutes / 360) * 100))
+    });
+  },
+
+  persist(tasks, categories = this.data.categories) {
+    const sorted = sortTasks(ensureTaskOrder(normalizeTaskSubjects(tasks)));
+    const cleanCategories = normalizeTaskCategories(categories);
+    wx.setStorageSync('studyTasks', sorted);
+    wx.setStorageSync('studyTaskCategories', cleanCategories);
+    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories }).catch(() => {});
+    this.setData({ activeTaskId: '' });
+    this.load();
+  },
+
+  toggle(e) {
+    const id = e.currentTarget.dataset.id;
+    const task = this.data.tasks.find(x => x.id === id);
+    if (!task) return;
+    if (!task.done) {
+      const today = new Date().toLocaleDateString('zh-CN');
+      const dates = wx.getStorageSync('studyActiveDates') || [];
+      if (!dates.includes(today)) wx.setStorageSync('studyActiveDates', [...dates, today]);
+    }
+    this.persist(updateTask(this.data.tasks, id, { done: !task.done }));
+  },
+
+  changeDuration(e) {
+    const id = e.currentTarget.dataset.id;
+    this.persist(updateTask(this.data.tasks, id, { minutes: this.data.durationOptions[Number(e.detail.value)] }));
+  },
+
+  onTaskTouchStart(e) {
+    this.setData({ touchStartX: e.touches[0].clientX });
+  },
+
+  onTaskTouchEnd(e) {
+    const delta = e.changedTouches[0].clientX - this.data.touchStartX;
+    const id = e.currentTarget.dataset.id;
+    if (delta < -50) this.setData({ activeTaskId: id });
+    if (delta > 50) this.setData({ activeTaskId: '' });
+  },
+
+  togglePin(e) {
+    const id = e.currentTarget.dataset.id;
+    const task = this.data.tasks.find(x => x.id === id);
+    if (task) this.persist(updateTask(this.data.tasks, id, { pinned: !task.pinned }));
+  },
+
+  chooseCategory(e) {
+    const id = e.currentTarget.dataset.id;
+    const items = [...this.data.categories, '＋ 新建分类', '管理分类'];
+    wx.showActionSheet({
+      itemList: items,
+      success: ({ tapIndex }) => {
+        if (tapIndex < this.data.categories.length) {
+          this.persist(updateTask(this.data.tasks, id, { subject: this.data.categories[tapIndex] }));
+          return;
+        }
+        if (tapIndex === this.data.categories.length) {
+          this.promptCreateCategory(id);
+          return;
+        }
+        this.manageCategories();
+      }
+    });
+  },
+
+  showCategoryError(error) {
+    wx.showToast({ title: error === 'empty' ? '分类名称不能为空' : '已有同名分类', icon: 'none' });
+  },
+
+  promptCreateCategory(taskId) {
+    wx.showModal({
+      title: '新建分类', editable: true, placeholderText: '例如：通信原理',
+      success: result => {
+        if (!result.confirm) return;
+        const outcome = createCategory(this.data.categories, result.content);
+        if (outcome.error) return this.showCategoryError(outcome.error);
+        const tasks = taskId ? updateTask(this.data.tasks, taskId, { subject: outcome.categories[outcome.categories.length - 1] }) : this.data.tasks;
+        this.persist(tasks, outcome.categories);
+      }
+    });
+  },
+
+  manageCategories() {
+    if (!this.data.categories.length) {
+      wx.showModal({ title: '管理分类', content: '还没有分类，可先新建分类。', showCancel: false });
+      return;
+    }
+    wx.showActionSheet({
+      itemList: this.data.categories,
+      success: ({ tapIndex }) => this.manageCategory(this.data.categories[tapIndex])
+    });
+  },
+
+  manageCategory(name) {
+    wx.showActionSheet({
+      itemList: ['重命名', '删除'],
+      success: ({ tapIndex }) => {
+        if (tapIndex === 0) this.promptRenameCategory(name);
+        if (tapIndex === 1) this.confirmDeleteCategory(name);
+      }
+    });
+  },
+
+  promptRenameCategory(name) {
+    wx.showModal({
+      title: '重命名分类', content: `当前名称：${name}`, editable: true, placeholderText: '输入新的分类名称',
+      success: result => {
+        if (!result.confirm) return;
+        const outcome = renameCategory(this.data.categories, this.data.tasks, name, result.content);
+        if (outcome.error) return this.showCategoryError(outcome.error);
+        this.persist(outcome.tasks, outcome.categories);
+      }
+    });
+  },
+
+  confirmDeleteCategory(name) {
+    wx.showModal({
+      title: `删除“${name}”？`, content: '分类下的任务将变为未分类，任务内容不会删除。', confirmColor: '#e65050',
+      success: result => {
+        if (!result.confirm) return;
+        const outcome = deleteCategory(this.data.categories, this.data.tasks, name);
+        this.persist(outcome.tasks, outcome.categories);
+      }
+    });
+  },
+
+  confirmDelete(e) {
+    const id = e.currentTarget.dataset.id;
+    wx.showModal({
+      title: '删除任务？', content: '删除后无法恢复。', confirmColor: '#e65050',
+      success: result => { if (result.confirm) this.persist(removeTask(this.data.tasks, id)); }
+    });
+  },
+
+  setNewTask(e) {
+    this.setData({ newTask: e.detail.value });
+  },
+
+  addTask() {
+    const title = this.data.newTask.trim();
+    if (!title) return wx.showToast({ title: '先写下任务内容', icon: 'none' });
+    this.persist([...this.data.tasks, {
+      id: String(Date.now()), title, subject: UNCATEGORIZED, minutes: null, done: false, pinned: false,
+      order: nextTopOrder(this.data.tasks)
+    }]);
+    this.setData({ newTask: '' });
+  },
+
+  goFocus() {
+    wx.switchTab({ url: '/pages/focus/focus' });
+  }
+});
