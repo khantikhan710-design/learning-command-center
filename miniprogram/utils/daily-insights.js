@@ -52,4 +52,9 @@ function getDailyInsight(date) {
   return INSIGHTS[((dayNumber % INSIGHTS.length) + INSIGHTS.length) % INSIGHTS.length];
 }
 
-module.exports = { INSIGHTS, getDailyInsight };
+function getNextInsight(cursor = 0) {
+  const currentIndex = Number.isInteger(cursor) ? ((cursor % INSIGHTS.length) + INSIGHTS.length) % INSIGHTS.length : 0;
+  return { insight: INSIGHTS[currentIndex], nextIndex: (currentIndex + 1) % INSIGHTS.length };
+}
+
+module.exports = { INSIGHTS, getDailyInsight, getNextInsight };

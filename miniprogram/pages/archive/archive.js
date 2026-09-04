@@ -4,14 +4,15 @@ const { formatRecordDate } = require('../../utils/date-display');
 const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
 const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
 const { buildFocusDashboard } = require('../../utils/focus-statistics');
+const { getBackupStatus } = require('../../utils/backup-status');
 
 Page({
-  data: { folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null, weeklyStats: { totalMinutes: 0, daily: [], subjects: [], tasks: [] } },
+  data: { folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null, backupStatus: { text: '尚未生成完整备份', needsBackup: true }, weeklyStats: { totalMinutes: 0, daily: [], subjects: [], tasks: [] } },
   onShow() {
     const localRecords = wx.getStorageSync('studyRecords') || [];
     const localReviews = wx.getStorageSync('reviewItems') || [];
     const localTasks = wx.getStorageSync('studyTasks') || [];
-    this.setData({ weeklyStats: buildFocusDashboard(wx.getStorageSync('focusSessions') || []) });
+    this.setData({ weeklyStats: buildFocusDashboard(wx.getStorageSync('focusSessions') || []), backupStatus: this.readBackupStatus() });
     this.setEntries(localRecords, localReviews, localTasks);
     Promise.all([cloudStore.loadSnapshot('records'), cloudStore.loadSnapshot('reviews'), cloudStore.loadTaskState()]).then(([records, reviews, taskState]) => {
       const cloudTasks = Array.isArray(taskState) ? taskState : taskState && taskState.tasks;
@@ -49,9 +50,19 @@ Page({
       return storage;
     }, {});
   },
+  readBackupStatus() {
+    return getBackupStatus(wx.getStorageSync('lastLocalBackupAt'));
+  },
   copyBackup() {
     const text = createBackup(this.readBackupStorage());
-    wx.setClipboardData({ data: text, success: () => wx.showToast({ title: '备份已复制', icon: 'success' }) });
+    wx.setClipboardData({
+      data: text,
+      success: () => {
+        wx.setStorageSync('lastLocalBackupAt', new Date().toISOString());
+        this.setData({ backupStatus: this.readBackupStatus() });
+        wx.showToast({ title: '备份已复制', icon: 'success' });
+      }
+    });
   },
   toggleRestore() {
     this.setData({ showRestore: !this.data.showRestore, backupText: '', backupPreview: null });

@@ -5,7 +5,7 @@ const { formatGoalMinutes, goalMinutesFromPicker, goalPickerValue } = require('.
 const { dueReviews, buildDailySummary } = require('../../utils/review-status');
 const { buildReviewCoach } = require('../../utils/review-coach');
 const { buildDailyPlan } = require('../../utils/daily-plan');
-const { getDailyInsight } = require('../../utils/daily-insights');
+const { getNextInsight } = require('../../utils/daily-insights');
 const { getTaskDragState } = require('../../utils/task-drag');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
@@ -26,9 +26,11 @@ Page({
 
   onShow() {
     const today = new Date();
+    const refreshedInsight = getNextInsight(wx.getStorageSync('studyInsightCursor'));
+    wx.setStorageSync('studyInsightCursor', refreshedInsight.nextIndex);
     this.setData({
       date: today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }),
-      insight: getDailyInsight(today)
+      insight: refreshedInsight.insight
     });
     this.load();
     cloudStore.loadTaskState().then(snapshot => {
