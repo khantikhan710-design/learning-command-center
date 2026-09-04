@@ -9,6 +9,9 @@ assert.deepEqual(recordReviewDay(['2026/9/2'], now), ['2026/9/2', '2026/9/4']);
 assert.deepEqual(buildReviewCoach({ activityDates: [], dueCount: 0, reviewCount: 0, now }), {
   title: '从第一条开始', message: '添加一条错题或概念，建立自己的复习队列。', streak: 0, missedDays: 0
 });
+assert.deepEqual(buildReviewCoach({ activityDates: [], dueCount: 1, reviewCount: 3, now }), {
+  title: '从今天开始复习', message: '今天先完成一条到期复习，建立自己的节奏。', streak: 0, missedDays: 0
+});
 assert.deepEqual(buildReviewCoach({ activityDates: ['2026/9/4'], dueCount: 1, reviewCount: 3, now }), {
   title: '连续复习第 1 天', message: '今天先完成一条，先把节奏建立起来。', streak: 1, missedDays: 0
 });

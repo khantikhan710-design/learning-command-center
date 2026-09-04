@@ -38,6 +38,7 @@ function buildReviewCoach({ activityDates = [], dueCount = 0, reviewCount = 0, n
   const missedDays = !hasToday && lastDay ? Math.max(0, Math.round((today - lastDay) / (24 * 60 * 60 * 1000)) - 1) : 0;
 
   if (!reviewCount) return { title: '从第一条开始', message: '添加一条错题或概念，建立自己的复习队列。', streak: 0, missedDays: 0 };
+  if (!dates.length && dueCount) return { title: '从今天开始复习', message: '今天先完成一条到期复习，建立自己的节奏。', streak: 0, missedDays: 0 };
   if (dueCount >= 4) {
     const gap = missedDays ? `已间隔 ${missedDays} 天，今天不补量。` : '';
     return { title: '先清复习积压', message: `现在有 ${dueCount} 条待复习，先完成最早 3 条，再做新内容。${gap}`, streak, missedDays };
