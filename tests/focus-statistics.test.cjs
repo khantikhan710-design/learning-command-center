@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { sessionsForWeek, summarizeSessions } = require('../miniprogram/utils/focus-statistics');
+const { sessionsForWeek, summarizeSessions, buildFocusDashboard } = require('../miniprogram/utils/focus-statistics');
 
 const now = new Date('2026-09-04T12:00:00+08:00').getTime();
 const sessions = [
@@ -14,4 +14,14 @@ assert.deepEqual(summarizeSessions(sessionsForWeek(sessions, now)), {
   subjects: [{ name: '考研数学', minutes: 30 }, { name: '英语', minutes: 20 }],
   tasks: [{ name: '欧几里得刷题', minutes: 30 }]
 });
+
+const dashboard = buildFocusDashboard(sessions, now);
+assert.equal(dashboard.daily.length, 7);
+assert.equal(dashboard.daily.at(-1).minutes, 20);
+assert.equal(dashboard.daily.at(-1).label, '9/4');
+assert.equal(dashboard.daily.at(-1).height, 40);
+assert.deepEqual(dashboard.subjects, [
+  { name: '考研数学', minutes: 80, percent: 80 },
+  { name: '英语', minutes: 20, percent: 20 }
+]);
 console.log('focus statistics tests passed');
