@@ -3,13 +3,15 @@ const { buildMonthlyFolders } = require('../../utils/archive-folders');
 const { formatRecordDate } = require('../../utils/date-display');
 const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
 const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
+const { sessionsForWeek, summarizeSessions } = require('../../utils/focus-statistics');
 
 Page({
-  data: { folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null },
+  data: { folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null, weeklyStats: { totalMinutes: 0, subjects: [], tasks: [] } },
   onShow() {
     const localRecords = wx.getStorageSync('studyRecords') || [];
     const localReviews = wx.getStorageSync('reviewItems') || [];
     const localTasks = wx.getStorageSync('studyTasks') || [];
+    this.setData({ weeklyStats: summarizeSessions(sessionsForWeek(wx.getStorageSync('focusSessions') || [])) });
     this.setEntries(localRecords, localReviews, localTasks);
     Promise.all([cloudStore.loadSnapshot('records'), cloudStore.loadSnapshot('reviews'), cloudStore.loadTaskState()]).then(([records, reviews, taskState]) => {
       const cloudTasks = Array.isArray(taskState) ? taskState : taskState && taskState.tasks;

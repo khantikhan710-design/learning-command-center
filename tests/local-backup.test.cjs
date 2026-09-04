@@ -8,6 +8,7 @@ const storage = {
   recordCategories: ['考研数学'],
   reviewItems: [{ id: 'v1', content: '复习戴维南定理' }],
   reviewCategories: ['概念'],
+  focusSessions: [{ id: 's1', minutes: 25, subject: '考研数学' }],
   focusMinutes: 150,
   studyActiveDates: ['2026/9/4']
 };
@@ -16,6 +17,7 @@ const backup = parseBackup(text);
 assert.equal(backup.format, 'study-command-center-backup');
 assert.equal(backup.exportedAt, '2026-09-04T09:00:00.000Z');
 assert.deepEqual(backup.data.studyTasks, storage.studyTasks);
+assert.deepEqual(backup.data.focusSessions, storage.focusSessions);
 assert.deepEqual(summarizeBackup(backup), { tasks: 1, records: 1, reviews: 1, focusMinutes: 150 });
 const emptyBackup = parseBackup(createBackup({}));
 assert.deepEqual(summarizeBackup(emptyBackup), { tasks: 0, records: 0, reviews: 0, focusMinutes: 0 });
