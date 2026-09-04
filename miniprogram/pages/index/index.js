@@ -1,5 +1,6 @@
 const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask } = require('../../utils/task-actions');
 const cloudStore = require('../../utils/cloud-store');
+const { buildCategoryMenu } = require('../../utils/category-menu');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -98,19 +99,23 @@ Page({
 
   chooseCategory(e) {
     const id = e.currentTarget.dataset.id;
-    const items = [...this.data.categories, '＋ 新建分类', '管理分类'];
+    this.showCategoryMenu(id);
+  },
+
+  showCategoryMenu(id, offset = 0) {
+    const entries = buildCategoryMenu(this.data.categories, offset, [
+      { type: 'create', label: '＋ 新建分类' },
+      { type: 'manage', label: '管理分类' }
+    ]);
     wx.showActionSheet({
-      itemList: items,
+      itemList: entries.map(entry => entry.label),
       success: ({ tapIndex }) => {
-        if (tapIndex < this.data.categories.length) {
-          this.persist(updateTask(this.data.tasks, id, { subject: this.data.categories[tapIndex] }));
-          return;
-        }
-        if (tapIndex === this.data.categories.length) {
-          this.promptCreateCategory(id);
-          return;
-        }
-        this.manageCategories();
+        const entry = entries[tapIndex];
+        if (entry.type === 'category') return this.persist(updateTask(this.data.tasks, id, { subject: entry.name }));
+        if (entry.type === 'more') return this.showCategoryMenu(id, entry.offset);
+        if (entry.type === 'create') return this.promptCreateCategory(id);
+        if (entry.type === 'manage') return this.manageCategories();
+        this.showCategoryMenu(id);
       }
     });
   },
@@ -132,14 +137,20 @@ Page({
     });
   },
 
-  manageCategories() {
+  manageCategories(offset = 0) {
     if (!this.data.categories.length) {
       wx.showModal({ title: '管理分类', content: '还没有分类，可先新建分类。', showCancel: false });
       return;
     }
+    const entries = buildCategoryMenu(this.data.categories, offset);
     wx.showActionSheet({
-      itemList: this.data.categories,
-      success: ({ tapIndex }) => this.manageCategory(this.data.categories[tapIndex])
+      itemList: entries.map(entry => entry.label),
+      success: ({ tapIndex }) => {
+        const entry = entries[tapIndex];
+        if (entry.type === 'category') return this.manageCategory(entry.name);
+        if (entry.type === 'more') return this.manageCategories(entry.offset);
+        this.manageCategories();
+      }
     });
   },
 
