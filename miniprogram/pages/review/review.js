@@ -3,10 +3,11 @@ const { nextReview } = require('../../utils/spaced-repetition');
 const { mergeCategories, buildFolders, markMastered, unmarkMastered } = require('../../utils/study-folders');
 const { buildPrompts } = require('../../utils/review-prompts');
 const { removeReview } = require('../../utils/review-actions');
+const { dueReviews } = require('../../utils/review-status');
 const defaultCategories = ['错题', '概念', '硬件设计', 'AI想法'];
 
 Page({
-  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
+  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], dueItems: [], duePreview: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
   onShow() {
     this.setData({ categories: wx.getStorageSync('reviewCategories') || defaultCategories });
     this.setItems(wx.getStorageSync('reviewItems') || []);
@@ -19,7 +20,8 @@ Page({
   },
   setItems(items) {
     wx.setStorageSync('reviewItems', items);
-    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered) });
+    const dueItems = dueReviews(items);
+    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered), dueItems, duePreview: dueItems.slice(0, 3) });
   },
   persist(items) { this.setItems(items); cloudStore.saveSnapshot('reviews', items).catch(() => {}); },
   pick(e) { this.setData({ type: e.currentTarget.dataset.t }); },
@@ -44,6 +46,9 @@ Page({
   review(e) {
     const id = e.currentTarget.dataset.id;
     this.persist(this.data.items.map(item => item.id === id ? { ...item, ...nextReview(item.stage) } : item));
+  },
+  reviewDue(e) {
+    this.review(e);
   },
   showPrompts(e) {
     const id = e.currentTarget.dataset.id;

@@ -2,6 +2,7 @@ const { sortTasks, ensureTaskOrder, nextTopOrder, updateTask, removeTask, create
 const cloudStore = require('../../utils/cloud-store');
 const { buildCategoryMenu } = require('../../utils/category-menu');
 const { formatGoalMinutes, goalMinutesFromPicker, goalPickerValue } = require('../../utils/goal-time');
+const { dueReviews, buildDailySummary } = require('../../utils/review-status');
 const {
   DEFAULT_TASK_CATEGORIES, UNCATEGORIZED, normalizeTaskCategories,
   normalizeTaskSubjects, createCategory, renameCategory, deleteCategory
@@ -9,7 +10,7 @@ const {
 
 Page({
   data: {
-    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0,
+    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0,
     newTask: '', date: '', activeTaskId: '', touchStartX: 0, categories: DEFAULT_TASK_CATEGORIES,
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
@@ -46,6 +47,7 @@ Page({
     wx.setStorageSync('studyTasks', tasks);
     const completedMinutes = tasks.filter(x => x.done).reduce((n, x) => n + (x.minutes || 0), 0);
     const focusMinutes = wx.getStorageSync('focusMinutes') || 0;
+    const dueItems = dueReviews(wx.getStorageSync('reviewItems') || []);
     const storedGoal = wx.getStorageSync('dailyGoalMinutes');
     const goalMinutes = Number.isFinite(storedGoal) && storedGoal > 0 ? storedGoal : 360;
     const dates = wx.getStorageSync('studyActiveDates') || [];
@@ -58,7 +60,7 @@ Page({
     this.setData({
       tasks, pendingTasks: pending, completedTasks: completed, categories, total: tasks.length, completed: completed.length,
       completedMinutes, focusMinutes, goalMinutes, goalLabel: formatGoalMinutes(goalMinutes), goalPickerValue: goalPickerValue(goalMinutes), streak,
-      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100))
+      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100)), dueItems, dueReviewCount: dueItems.length
     });
   },
 
@@ -229,6 +231,21 @@ Page({
     wx.setStorageSync('dailyGoalMinutes', minutes);
     this.setData({ goalMinutes: minutes, goalLabel: formatGoalMinutes(minutes), goalPickerValue: [hourIndex, minuteIndex] });
     this.load();
+  },
+
+  goReview() {
+    wx.switchTab({ url: '/pages/review/review' });
+  },
+
+  copyDailySummary() {
+    wx.setClipboardData({
+      data: buildDailySummary({
+        date: new Date(), completed: this.data.completed, total: this.data.total,
+        focusMinutes: this.data.focusMinutes, goalMinutes: this.data.goalMinutes,
+        dueItems: this.data.dueItems
+      }),
+      success: () => wx.showToast({ title: '今日总结已复制', icon: 'success' })
+    });
   },
 
   goFocus() {
