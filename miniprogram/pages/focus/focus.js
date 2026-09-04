@@ -1,6 +1,7 @@
 const { toSeconds, fromSeconds } = require('../../utils/timer');
 const { beginExit, returnFromBreak, formatElapsed } = require('../../utils/focus-guard');
 const cloudStore = require('../../utils/cloud-store');
+const { buildFocusAttribution } = require('../../utils/focus-attribution');
 const pad = n => String(n).padStart(2, '0');
 Page({
   data:{minutes:25,seconds:0,running:false,label:'设置你的专注时长',today:0,timer:null,minuteOptions:[],secondOptions:[],pickerValue:[25,0],initialSeconds:1500,strict:false,breaksLeft:3,onBreak:false,breakSeconds:0,breakTimer:null,lastUnexpectedLeave:0,breakStartAt:0,lastBreakText:'',subjectOptions:['未分类'],taskOptions:[{id:'',title:'不关联具体任务',subject:''}],subjectIndex:0,taskIndex:0,selectedSubject:'未分类',selectedTaskId:'',selectedTaskTitle:''},
@@ -8,11 +9,8 @@ Page({
   onUnload(){this.stop();this.stopBreak()},
   onHide(){if(this.data.strict&&this.data.running&&!this.data.onBreak){const result=beginExit(this.data.running,this.data.breaksLeft);if(result.paused)this.stop();if(result.allowed){const now=Date.now();this.setData({breaksLeft:result.remaining,onBreak:true,breakSeconds:result.seconds,breakStartAt:now,breakEndsAt:now+result.seconds*1000,lastBreakText:'',label:'临时离开中（最多 5 分钟）'})}else this.setData({lastUnexpectedLeave:Date.now()})}},
   onShow(){
-    const tasks=(wx.getStorageSync('studyTasks')||[]).filter(task=>!task.done);
-    const savedCategories=wx.getStorageSync('taskCategories')||[];
-    const subjectOptions=['未分类',...savedCategories.filter(name=>name&&name!=='未分类')];
-    const taskOptions=[{id:'',title:'不关联具体任务',subject:''},...tasks.map(task=>({id:task.id,title:task.title,subject:task.subject||'未分类'}))];
-    this.setData({today:wx.getStorageSync('focusMinutes')||0,subjectOptions,taskOptions});
+    const attribution=buildFocusAttribution(wx.getStorageSync('studyTasks')||[],wx.getStorageSync('studyTaskCategories')||[]);
+    this.setData({today:wx.getStorageSync('focusMinutes')||0,...attribution});
     if(this.data.lastUnexpectedLeave){this.setData({lastUnexpectedLeave:0});wx.showToast({title:'3 次离开机会已用完',icon:'none'})}if(this.data.onBreak)this.endBreak('returned')
   },
   pickerChange(e){if(this.data.running)return;const [m,s]=e.detail.value.map(Number);this.setData({minutes:m,seconds:s,pickerValue:[m,s],initialSeconds:toSeconds(m,s),label:'准备开始'})},
