@@ -4,10 +4,11 @@ const { mergeCategories, buildFolders, markMastered, unmarkMastered } = require(
 const { buildPrompts } = require('../../utils/review-prompts');
 const { removeReview } = require('../../utils/review-actions');
 const { dueReviews } = require('../../utils/review-status');
+const { recordReviewDay, buildReviewCoach } = require('../../utils/review-coach');
 const defaultCategories = ['错题', '概念', '硬件设计', 'AI想法'];
 
 Page({
-  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], dueItems: [], duePreview: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
+  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], dueItems: [], duePreview: [], coach: {}, open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
   onShow() {
     this.setData({ categories: wx.getStorageSync('reviewCategories') || defaultCategories });
     this.setItems(wx.getStorageSync('reviewItems') || []);
@@ -21,9 +22,13 @@ Page({
   setItems(items) {
     wx.setStorageSync('reviewItems', items);
     const dueItems = dueReviews(items);
-    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered), dueItems, duePreview: dueItems.slice(0, 3) });
+    const coach = buildReviewCoach({ activityDates: wx.getStorageSync('reviewActiveDates') || [], dueCount: dueItems.length, reviewCount: items.length });
+    this.setData({ items, folders: buildFolders(items, this.data.categories, 'type'), mastered: items.filter(item => item.mastered), dueItems, duePreview: dueItems.slice(0, 3), coach });
   },
   persist(items) { this.setItems(items); cloudStore.saveSnapshot('reviews', items).catch(() => {}); },
+  recordActivity() {
+    wx.setStorageSync('reviewActiveDates', recordReviewDay(wx.getStorageSync('reviewActiveDates') || []));
+  },
   pick(e) { this.setData({ type: e.currentTarget.dataset.t }); },
   addCategory() {
     wx.showModal({ title: '新增复盘分类', editable: true, placeholderText: '例如：信号与系统', success: result => {
@@ -45,6 +50,7 @@ Page({
   },
   review(e) {
     const id = e.currentTarget.dataset.id;
+    this.recordActivity();
     this.persist(this.data.items.map(item => item.id === id ? { ...item, ...nextReview(item.stage) } : item));
   },
   reviewDue(e) {
@@ -58,6 +64,7 @@ Page({
   },
   done(e) {
     const id = e.currentTarget.dataset.id;
+    this.recordActivity();
     this.persist(markMastered(this.data.items, id, new Date().toLocaleDateString('zh-CN')));
     this.setData({ activePromptId: null, activePrompts: [] });
   },

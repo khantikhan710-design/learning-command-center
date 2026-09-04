@@ -1,6 +1,6 @@
 const BACKUP_FORMAT = 'study-command-center-backup';
 const BACKUP_VERSION = 1;
-const ARRAY_KEYS = ['studyTasks', 'studyTaskCategories', 'studyRecords', 'recordCategories', 'reviewItems', 'reviewCategories', 'studyActiveDates', 'focusSessions'];
+const ARRAY_KEYS = ['studyTasks', 'studyTaskCategories', 'studyRecords', 'recordCategories', 'reviewItems', 'reviewCategories', 'studyActiveDates', 'reviewActiveDates', 'focusSessions'];
 const STORAGE_KEYS = [...ARRAY_KEYS, 'focusMinutes'];
 
 function copyData(storage) {
@@ -32,6 +32,7 @@ function parseBackup(text) {
   if (!backup || backup.format !== BACKUP_FORMAT || backup.version !== BACKUP_VERSION) throw new Error('不是学习指挥台备份');
   if (!backup.data || typeof backup.data !== 'object') throw new Error('备份缺少学习数据');
   if (!Array.isArray(backup.data.focusSessions)) backup.data.focusSessions = [];
+  if (!Array.isArray(backup.data.reviewActiveDates)) backup.data.reviewActiveDates = [];
   if (ARRAY_KEYS.some(key => !Array.isArray(backup.data[key]))) throw new Error('备份数据格式不完整');
   if (!Number.isFinite(backup.data.focusMinutes) || backup.data.focusMinutes < 0) throw new Error('备份专注时长无效');
   return backup;
