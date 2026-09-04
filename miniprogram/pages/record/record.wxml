@@ -5,10 +5,14 @@
       <block wx:for="{{categories}}" wx:key="*this"><text class="pill {{subject===item?'selected':''}}" data-s="{{item}}" bindtap="pickSubject">{{item}}</text></block>
       <text class="pill new-category" bindtap="addCategory">＋ 新增分类</text>
     </view>
+    <view class="material-meta">
+      <text class="source-chip" bindtap="chooseSource">来源：{{source}} · 选择</text>
+      <input class="input material-title" value="{{title}}" placeholder="资料标题，例如：积分中值定理错题第 3 组" bindinput="inputTitle" />
+    </view>
     <textarea class="input note" value="{{content}}" placeholder="记录题数、正确率、薄弱点……" bindinput="input"/>
     <view class="photos"><block wx:for="{{images}}" wx:key="*this"><image src="{{item}}" mode="aspectFill"/></block><button class="photo-btn" bindtap="chooseImage">＋ 图片</button><button class="photo-btn" bindtap="chooseFile">＋ PDF / Word</button></view>
     <view wx:for="{{files}}" wx:key="path" class="file">📎 {{item.name}}</view>
-    <button class="primary" bindtap="save">保存记录</button>
+    <button class="primary" bindtap="save">保存资料卡</button>
   </view>
   <view class="section-title">学习收藏夹</view>
   <block wx:for="{{folders}}" wx:key="name">
@@ -17,8 +21,16 @@
       <block wx:if="{{open[item.name]}}">
         <block wx:for="{{item.items}}" wx:for-item="record" wx:key="id">
           <view class="record-wrap">
-            <view class="record" data-id="{{record.id}}" bindtouchstart="start" bindtouchend="end">
-              <view><text class="tag">{{record.pinned?'📌 ':''}}{{record.displayDate}}</text><text class="content selectable" user-select>{{record.content}}</text><text wx:if="{{record.content}}" class="copy-text" data-text="{{record.content}}" catchtap="copyRecordText">复制文字</text><view class="thumbs"><image wx:for="{{record.images}}" wx:for-item="image" wx:key="*this" src="{{image}}" mode="aspectFill" data-image="{{image}}" data-images="{{record.images}}" bindtap="previewRecordImage"/></view><view wx:for="{{record.files}}" wx:for-item="file" wx:key="cloudFileID" class="file" data-f="{{file}}" bindtap="fileActions">📎 {{file.name}} · 打开/转发</view></view>
+            <view class="record {{focusRecordId===record.id?'focused-record':''}}" data-id="{{record.id}}" bindtouchstart="start" bindtouchend="end">
+              <view>
+                <text class="tag">{{record.pinned?'📌 ':''}}{{record.displayDate}} · {{record.source}}</text>
+                <text class="record-title selectable" user-select>{{record.displayTitle}}</text>
+                <text wx:if="{{record.content}}" class="content selectable" user-select>{{record.content}}</text>
+                <text wx:if="{{record.content}}" class="copy-text" data-text="{{record.content}}" catchtap="copyRecordText">复制文字</text>
+                <text class="copy-text" data-id="{{record.id}}" catchtap="createReview">转为复盘</text>
+                <view class="thumbs"><image wx:for="{{record.images}}" wx:for-item="image" wx:key="*this" src="{{image}}" mode="aspectFill" data-image="{{image}}" data-images="{{record.images}}" bindtap="previewRecordImage"/></view>
+                <view wx:for="{{record.files}}" wx:for-item="file" wx:key="cloudFileID" class="file" data-f="{{file}}" bindtap="fileActions">📎 {{file.name}} · 打开/转发</view>
+              </view>
             </view>
             <view wx:if="{{activeRecordId===record.id}}" class="record-actions"><view class="action pin" data-id="{{record.id}}" bindtap="pin">{{record.pinned?'取消置顶':'置顶'}}</view><view class="action delete" data-id="{{record.id}}" bindtap="remove">删除</view></view>
           </view>

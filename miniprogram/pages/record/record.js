@@ -2,11 +2,12 @@ const cloudStore = require('../../utils/cloud-store');
 const { mergeCategories, buildFolders } = require('../../utils/study-folders');
 const { getPreviewUrls, currentPreviewUrl } = require('../../utils/evidence-links');
 const { formatRecordDate } = require('../../utils/date-display');
+const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft } = require('../../utils/study-material-cards');
 const defaults = ['考研数学', '专业基础', '硬件电路', '英语', 'AI学习'];
 const sort = records => [...records].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 
 Page({
-  data: { subject: '考研数学', categories: defaults, content: '', images: [], files: [], records: [], folders: [], open: {}, activeRecordId: '', touchStartX: 0 },
+  data: { subject: '考研数学', categories: defaults, source: 'Goodnotes', sources: MATERIAL_SOURCES, title: '', content: '', images: [], files: [], records: [], folders: [], open: {}, activeRecordId: '', focusRecordId: '', touchStartX: 0 },
   onShow() {
     const categories = wx.getStorageSync('recordCategories') || defaults;
     this.setData({ categories });
@@ -14,7 +15,7 @@ Page({
     cloudStore.loadSnapshot('records').then(records => records && this.setRecords(records)).catch(() => {});
   },
   setRecords(records) {
-    records = sort(records).map(record => ({ ...record, displayDate: formatRecordDate(record.date) }));
+    records = sort(records).map(record => ({ ...record, source: normalizeMaterialSource(record.source), displayTitle: materialTitle(record), displayDate: formatRecordDate(record.date) }));
     wx.setStorageSync('studyRecords', records);
     this.setData({ records, folders: buildFolders(records, this.data.categories) });
   },
@@ -24,6 +25,9 @@ Page({
     this.setData({ activeRecordId: '' });
   },
   pickSubject(e) { this.setData({ subject: e.currentTarget.dataset.s }); },
+  chooseSource() {
+    wx.showActionSheet({ itemList: this.data.sources, success: result => this.setData({ source: this.data.sources[result.tapIndex] }) });
+  },
   addCategory() {
     wx.showModal({ title: '新增分类', editable: true, placeholderText: '例如：模电专题', success: result => {
       const categories = mergeCategories(this.data.categories, result.content);
@@ -34,6 +38,7 @@ Page({
     }});
   },
   input(e) { this.setData({ content: e.detail.value }); },
+  inputTitle(e) { this.setData({ title: e.detail.value }); },
   chooseImage() { wx.chooseMedia({ count: 3, mediaType: ['image'], success: result => this.setData({ images: [...this.data.images, ...result.tempFiles.map(file => file.tempFilePath)] }) }); },
   chooseFile() { wx.chooseMessageFile({ count: 5, type: 'file', success: result => this.setData({ files: [...this.data.files, ...result.tempFiles] }) }); },
   toggleFolder(e) { const name = e.currentTarget.dataset.n; this.setData({ [`open.${name}`]: !this.data.open[name] }); },
@@ -42,12 +47,33 @@ Page({
   pin(e) { const id = e.currentTarget.dataset.id; this.persist(this.data.records.map(record => record.id === id ? { ...record, pinned: !record.pinned } : record)); },
   remove(e) { const id = e.currentTarget.dataset.id; wx.showModal({ title: '删除记录？', content: '删除后无法恢复。', success: result => result.confirm && this.persist(this.data.records.filter(record => record.id !== id)) }); },
   save() {
-    if (!this.data.content.trim() && !this.data.images.length && !this.data.files.length) return wx.showToast({ title: '写内容或添加附件', icon: 'none' });
-    Promise.all([cloudStore.uploadImages(this.data.images), cloudStore.uploadFiles(this.data.files)]).then(([images, files]) => {
-      this.persist([{ id: Date.now(), subject: this.data.subject, content: this.data.content, images, files, date: new Date().toLocaleString('zh-CN'), pinned: false }, ...this.data.records]);
-      this.setData({ content: '', images: [], files: [] });
-      wx.showToast({ title: '已保存', icon: 'success' });
-    }).catch(() => wx.showToast({ title: '附件上传失败，请重试', icon: 'none' }));
+    const hasText = this.data.title.trim() || this.data.content.trim();
+    const hasAttachments = this.data.images.length || this.data.files.length;
+    if (!hasText && !hasAttachments) return wx.showToast({ title: '写内容或添加附件', icon: 'none' });
+    const makeRecord = (images = [], files = []) => ({ id: Date.now(), subject: this.data.subject, source: normalizeMaterialSource(this.data.source), title: this.data.title.trim(), content: this.data.content, images, files, date: new Date().toLocaleString('zh-CN'), pinned: false });
+    const finish = record => {
+      this.persist([record, ...this.data.records]);
+      this.setData({ title: '', content: '', images: [], files: [] });
+      wx.showToast({ title: '资料卡已保存', icon: 'success' });
+    };
+    if (!hasAttachments) return finish(makeRecord());
+    Promise.all([cloudStore.uploadImages(this.data.images), cloudStore.uploadFiles(this.data.files)]).then(([images, files]) => finish(makeRecord(images, files))).catch(() => wx.showModal({
+      title: '附件未保存',
+      content: '当前云存储不可用，文件尚未保存。可继续编辑并稍后重试，或仅保存文字资料卡。',
+      confirmText: '仅保存文字',
+      cancelText: '继续编辑',
+      success: result => {
+        if (!result.confirm) return;
+        if (!hasText) return wx.showToast({ title: '附件没有保存，请继续编辑', icon: 'none' });
+        finish(makeRecord());
+      }
+    }));
+  },
+  createReview(e) {
+    const record = this.data.records.find(item => item.id === e.currentTarget.dataset.id);
+    if (!record) return;
+    wx.setStorageSync('reviewDraftFromRecord', createReviewDraft(record));
+    wx.switchTab({ url: '/pages/review/review' });
   },
   previewRecordImage(e) {
     const images = e.currentTarget.dataset.images || [];
