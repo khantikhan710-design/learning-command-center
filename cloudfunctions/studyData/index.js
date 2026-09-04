@@ -15,7 +15,10 @@ exports.main = async event => {
   }
 
   if (event.action === 'save') {
-    if (!Array.isArray(event.items)) throw new Error('Invalid snapshot data');
+    const validItems = Array.isArray(event.items) || (
+      event.name === 'tasks' && event.items && Array.isArray(event.items.tasks) && Array.isArray(event.items.categories)
+    );
+    if (!validItems) throw new Error('Invalid snapshot data');
     const filter = snapshotFilter(OPENID);
     const current = await collection.where(filter).limit(1).get();
     const data = { ...filter, items: event.items, updatedAt: db.serverDate() };

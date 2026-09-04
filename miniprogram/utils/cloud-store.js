@@ -14,6 +14,14 @@ function saveSnapshot(name, items) {
   return callData('save', name, { items });
 }
 
+function loadTaskState() {
+  return callData('load', 'tasks').then(result => result.items);
+}
+
+function saveTaskState(state) {
+  return callData('save', 'tasks', { items: state });
+}
+
 function addFocusSession(data) {
   return callData('addFocus', 'focus', { data });
 }
@@ -33,4 +41,4 @@ function uploadFiles(files) {
   })));
 }
 
-module.exports = { ENV_ID, collectionFor, loadSnapshot, saveSnapshot, addFocusSession, uploadImages, uploadFiles };
+module.exports = { ENV_ID, collectionFor, loadSnapshot, saveSnapshot, loadTaskState, saveTaskState, addFocusSession, uploadImages, uploadFiles };
