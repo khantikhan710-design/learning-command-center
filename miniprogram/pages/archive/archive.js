@@ -2,9 +2,10 @@ const cloudStore = require('../../utils/cloud-store');
 const { buildMonthlyFolders } = require('../../utils/archive-folders');
 const { formatRecordDate } = require('../../utils/date-display');
 const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
+const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
 
 Page({
-  data: { folders: [], open: {} },
+  data: { folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null },
   onShow() {
     const localRecords = wx.getStorageSync('studyRecords') || [];
     const localReviews = wx.getStorageSync('reviewItems') || [];
@@ -39,5 +40,51 @@ Page({
     if (!folder) return;
     const markdown = buildMonthlyMarkdown(folder);
     wx.setClipboardData({ data: markdown, success: () => wx.showToast({ title: 'Obsidian 文本已复制', icon: 'success' }) });
+  },
+  readBackupStorage() {
+    return STORAGE_KEYS.reduce((storage, key) => {
+      storage[key] = wx.getStorageSync(key);
+      return storage;
+    }, {});
+  },
+  copyBackup() {
+    const text = createBackup(this.readBackupStorage());
+    wx.setClipboardData({ data: text, success: () => wx.showToast({ title: '备份已复制', icon: 'success' }) });
+  },
+  toggleRestore() {
+    this.setData({ showRestore: !this.data.showRestore, backupText: '', backupPreview: null });
+  },
+  setBackupText(e) {
+    this.setData({ backupText: e.detail.value, backupPreview: null });
+  },
+  previewRestore() {
+    try {
+      const backup = parseBackup(this.data.backupText);
+      this.setData({ backupPreview: summarizeBackup(backup) });
+    } catch (error) {
+      wx.showToast({ title: error.message, icon: 'none' });
+    }
+  },
+  confirmRestore() {
+    let backup;
+    try {
+      backup = parseBackup(this.data.backupText);
+    } catch (error) {
+      wx.showToast({ title: error.message, icon: 'none' });
+      return;
+    }
+    const summary = summarizeBackup(backup);
+    wx.showModal({
+      title: '确认恢复备份？',
+      content: `将覆盖本机现有数据：任务 ${summary.tasks} 项、记录 ${summary.records} 条、复盘 ${summary.reviews} 条。`,
+      confirmText: '确认覆盖', confirmColor: '#e65050',
+      success: result => {
+        if (!result.confirm) return;
+        STORAGE_KEYS.forEach(key => wx.setStorageSync(key, backup.data[key]));
+        this.setEntries(backup.data.studyRecords, backup.data.reviewItems, backup.data.studyTasks);
+        this.setData({ showRestore: false, backupText: '', backupPreview: null, open: {} });
+        wx.showToast({ title: '本机数据已恢复', icon: 'success' });
+      }
+    });
   }
 });
