@@ -6,7 +6,7 @@
       <view class="folder-head" data-n="{{item.name}}" bindtap="toggleFolder">📁 {{item.name}}（{{item.count}}）<text>{{open[item.name]?'收起':'展开'}}</text></view>
       <block wx:if="{{open[item.name]}}">
         <block wx:for="{{item.items}}" wx:for-item="review" wx:key="id">
-          <view class="review-item"><view>{{review.content}}</view><view class="muted">第 {{review.stage}} 次 · 下次 {{review.next}}</view><view class="buttons"><button size="mini" data-id="{{review.id}}" bindtap="review">复习完成</button><button size="mini" data-id="{{review.id}}" bindtap="showPrompts">举一反三</button><button size="mini" data-id="{{review.id}}" bindtap="done">掌握</button><button size="mini" class="delete-mini" data-id="{{review.id}}" bindtap="remove">删除</button></view><view wx:if="{{activePromptId===review.id}}" class="prompt-box"><view class="prompt-title">离线举一反三</view><block wx:for="{{activePrompts}}" wx:key="*this"><view class="prompt">{{item}}</view></block></view></view>
+          <view class="review-item"><view>{{review.content}}</view><text wx:if="{{review.recordId}}" class="related-record" data-id="{{review.recordId}}" bindtap="openRelatedRecord">📎 来自资料卡：{{review.sourceLabel || '其他'}}</text><view class="muted">第 {{review.stage}} 次 · 下次 {{review.next}}</view><view class="buttons"><button size="mini" data-id="{{review.id}}" bindtap="review">复习完成</button><button size="mini" data-id="{{review.id}}" bindtap="showPrompts">举一反三</button><button size="mini" data-id="{{review.id}}" bindtap="done">掌握</button><button size="mini" class="delete-mini" data-id="{{review.id}}" bindtap="remove">删除</button></view><view wx:if="{{activePromptId===review.id}}" class="prompt-box"><view class="prompt-title">离线举一反三</view><block wx:for="{{activePrompts}}" wx:key="*this"><view class="prompt">{{item}}</view></block></view></view>
         </block>
       </block>
     </view>
@@ -14,6 +14,6 @@
   <view wx:if="{{mastered.length}}" class="section">已复习（{{mastered.length}}）</view>
   <view wx:if="{{mastered.length}}" class="card folder mastered-folder">
     <view class="folder-head" bindtap="toggleMastered">📁 已复习 <text>{{openMastered?'收起':'展开'}}</text></view>
-    <block wx:if="{{openMastered}}"><block wx:for="{{mastered}}" wx:key="id"><view class="review-item mastered"><view>{{item.content}}</view><view class="muted">已掌握 · {{item.masteredAt}}</view><button size="mini" class="undo" data-id="{{item.id}}" bindtap="undoDone">取消掌握</button><button size="mini" class="delete-mini" data-id="{{item.id}}" bindtap="remove">删除</button></view></block></block>
+    <block wx:if="{{openMastered}}"><block wx:for="{{mastered}}" wx:key="id"><view class="review-item mastered"><view>{{item.content}}</view><text wx:if="{{item.recordId}}" class="related-record" data-id="{{item.recordId}}" bindtap="openRelatedRecord">📎 来自资料卡：{{item.sourceLabel || '其他'}}</text><view class="muted">已掌握 · {{item.masteredAt}}</view><button size="mini" class="undo" data-id="{{item.id}}" bindtap="undoDone">取消掌握</button><button size="mini" class="delete-mini" data-id="{{item.id}}" bindtap="remove">删除</button></view></block></block>
   </view>
 </view>

@@ -6,11 +6,16 @@ const { removeReview } = require('../../utils/review-actions');
 const defaultCategories = ['错题', '概念', '硬件设计', 'AI想法'];
 
 Page({
-  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [] },
+  data: { type: '错题', categories: defaultCategories, content: '', items: [], folders: [], mastered: [], open: {}, openMastered: false, activePromptId: null, activePrompts: [], pendingRecordId: '', pendingSourceLabel: '' },
   onShow() {
     this.setData({ categories: wx.getStorageSync('reviewCategories') || defaultCategories });
     this.setItems(wx.getStorageSync('reviewItems') || []);
     cloudStore.loadSnapshot('reviews').then(items => items && this.setItems(items)).catch(() => {});
+    const draft = wx.getStorageSync('reviewDraftFromRecord');
+    if (draft) {
+      wx.removeStorageSync('reviewDraftFromRecord');
+      this.setData({ content: draft.content, pendingRecordId: draft.recordId, pendingSourceLabel: draft.sourceLabel });
+    }
   },
   setItems(items) {
     wx.setStorageSync('reviewItems', items);
@@ -33,8 +38,8 @@ Page({
   save() {
     if (!this.data.content.trim()) return wx.showToast({ title: '写下一个可复习的问题', icon: 'none' });
     const schedule = nextReview(0);
-    this.persist([{ id: Date.now(), type: this.data.type, content: this.data.content, created: new Date().toLocaleDateString('zh-CN'), stage: 0, next: schedule.next, mastered: false }, ...this.data.items]);
-    this.setData({ content: '' });
+    this.persist([{ id: Date.now(), type: this.data.type, content: this.data.content, created: new Date().toLocaleDateString('zh-CN'), stage: 0, next: schedule.next, mastered: false, recordId: this.data.pendingRecordId || undefined, sourceLabel: this.data.pendingSourceLabel || undefined }, ...this.data.items]);
+    this.setData({ content: '', pendingRecordId: '', pendingSourceLabel: '' });
   },
   review(e) {
     const id = e.currentTarget.dataset.id;
@@ -55,6 +60,13 @@ Page({
     const id = e.currentTarget.dataset.id;
     this.persist(unmarkMastered(this.data.items, id));
     wx.showToast({ title: '已恢复到复盘队列', icon: 'success' });
+  },
+  openRelatedRecord(e) {
+    const recordId = e.currentTarget.dataset.id;
+    const record = (wx.getStorageSync('studyRecords') || []).find(item => String(item.id) === String(recordId));
+    if (!record) return wx.showToast({ title: '原资料已删除，复盘文字仍保留', icon: 'none' });
+    wx.setStorageSync('openRecordId', record.id);
+    wx.switchTab({ url: '/pages/record/record' });
   },
   remove(e) {
     const id = e.currentTarget.dataset.id;

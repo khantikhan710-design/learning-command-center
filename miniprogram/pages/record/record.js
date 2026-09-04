@@ -12,6 +12,15 @@ Page({
     const categories = wx.getStorageSync('recordCategories') || defaults;
     this.setData({ categories });
     this.setRecords(wx.getStorageSync('studyRecords') || []);
+    const openRecordId = wx.getStorageSync('openRecordId');
+    if (openRecordId) {
+      wx.removeStorageSync('openRecordId');
+      const record = this.data.records.find(item => String(item.id) === String(openRecordId));
+      if (record) {
+        const folderKey = 'open.' + record.subject;
+        this.setData({ [folderKey]: true, focusRecordId: record.id });
+      }
+    }
     cloudStore.loadSnapshot('records').then(records => records && this.setRecords(records)).catch(() => {});
   },
   setRecords(records) {
