@@ -33,4 +33,12 @@ function buildMonthlyFolders(records, reviews, tasks = []) {
   }));
 }
 
-module.exports = { buildMonthlyFolders, monthKey };
+function toggleFolderOpen(open, key) {
+  const state = open || {};
+  return {
+    ...state,
+    [key]: !Boolean(state[key])
+  };
+}
+
+module.exports = { buildMonthlyFolders, monthKey, toggleFolderOpen };

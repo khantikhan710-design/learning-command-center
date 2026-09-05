@@ -1,5 +1,5 @@
 const cloudStore = require('../../utils/cloud-store');
-const { buildMonthlyFolders } = require('../../utils/archive-folders');
+const { buildMonthlyFolders, toggleFolderOpen } = require('../../utils/archive-folders');
 const { formatRecordDate } = require('../../utils/date-display');
 const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
 const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
@@ -50,7 +50,7 @@ Page({
   },
   toggleFolder(e) {
     const key = e.currentTarget.dataset.key;
-    this.setData({ [`open.${key}`]: !this.data.open[key] });
+    this.setData({ open: toggleFolderOpen(this.data.open, key) });
   },
   copySummary(e) {
     const folder = this.data.folders.find(item => item.key === e.currentTarget.dataset.key);
