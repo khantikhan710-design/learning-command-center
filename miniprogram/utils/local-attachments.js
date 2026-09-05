@@ -26,4 +26,23 @@ function saveLocalFiles(files, api = wx) {
   }))));
 }
 
-module.exports = { isCloudPath, saveLocalImages, saveLocalFiles };
+async function saveLocalFilesWithStatus(files, api = wx) {
+  const outcomes = await Promise.all(files.map(async file => {
+    if (Number(file.size) > MAX_LOCAL_FILE_BYTES) {
+      return { placeholder: createSourcePlaceholder(file, '文件超过本机 10MB 限额') };
+    }
+    try {
+      const [saved] = await saveLocalFiles([file], api);
+      return { file: { ...saved, status: 'saved' } };
+    } catch (error) {
+      return { placeholder: createSourcePlaceholder(file, describeSaveFailure(error)) };
+    }
+  }));
+  return {
+    files: outcomes.filter(item => item.file).map(item => item.file),
+    placeholders: outcomes.filter(item => item.placeholder).map(item => item.placeholder)
+  };
+}
+
+module.exports = { isCloudPath, saveLocalImages, saveLocalFiles, saveLocalFilesWithStatus };
+const { MAX_LOCAL_FILE_BYTES, createSourcePlaceholder, describeSaveFailure } = require('./attachment-status');
