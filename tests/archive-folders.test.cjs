@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { buildMonthlyFolders, toggleFolderOpen } = require('../miniprogram/utils/archive-folders');
+const { buildMonthlyFolders, toggleFolderOpen, buildRecordClipboardText } = require('../miniprogram/utils/archive-folders');
 
 const folders = buildMonthlyFolders(
   [{ id: 'r1', date: '2026-09-03T04:30:00.000Z', content: '节点电压法' }, { id: 'r2', date: '2026-08-20T04:30:00.000Z', content: '模电' }],
@@ -15,4 +15,6 @@ assert.equal(folders[0].label, '2026 年 09 月');
 assert.deepEqual(folders[0].tasks.map(task => task.id), ['t1']);
 assert.deepEqual(toggleFolderOpen({}, '2026-09'), { '2026-09': true });
 assert.deepEqual(toggleFolderOpen({ '2026-09': true }, '2026-09'), { '2026-09': false });
+assert.equal(buildRecordClipboardText({ title: '节点法例题', content: '列 KCL 方程后联立求解' }), '节点法例题\n列 KCL 方程后联立求解');
+assert.equal(buildRecordClipboardText({ title: '', content: '仅有正文' }), '仅有正文');
 console.log('archive folder tests passed');

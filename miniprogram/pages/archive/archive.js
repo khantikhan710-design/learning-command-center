@@ -1,6 +1,7 @@
 const cloudStore = require('../../utils/cloud-store');
-const { buildMonthlyFolders, toggleFolderOpen } = require('../../utils/archive-folders');
+const { buildMonthlyFolders, toggleFolderOpen, buildRecordClipboardText } = require('../../utils/archive-folders');
 const { formatRecordDate } = require('../../utils/date-display');
+const { isCloudPath } = require('../../utils/local-attachments');
 const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
 const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
 const { buildFocusDashboard } = require('../../utils/focus-statistics');
@@ -42,7 +43,13 @@ Page({
   setEntries(records, reviews, tasks) {
     const folders = buildMonthlyFolders(records, reviews, tasks).map(folder => ({
       ...folder,
-      records: folder.records.map(record => ({ ...record, displayDate: formatRecordDate(record.date) })),
+      records: folder.records.map(record => ({
+        ...record,
+        displayDate: formatRecordDate(record.date),
+        images: record.images || [],
+        files: record.files || [],
+        clipboardText: buildRecordClipboardText(record)
+      })),
       reviews: folder.reviews.map(review => ({ ...review, displayDate: review.created || review.masteredAt || '未记录时间' })),
       tasks: folder.tasks.map(task => ({ ...task, statusLabel: task.done ? '已完成' : '未完成' }))
     }));
@@ -51,6 +58,44 @@ Page({
   toggleFolder(e) {
     const key = e.currentTarget.dataset.key;
     this.setData({ open: toggleFolderOpen(this.data.open, key) });
+  },
+  copyRecordText(e) {
+    const text = e.currentTarget.dataset.text || '';
+    if (!text) return wx.showToast({ title: '这条记录没有可复制的文字', icon: 'none' });
+    wx.setClipboardData({ data: text, success: () => wx.showToast({ title: '记录文字已复制', icon: 'success' }) });
+  },
+  previewRecordImage(e) {
+    const images = e.currentTarget.dataset.images || [];
+    const current = e.currentTarget.dataset.image;
+    if (!images.length) return;
+    if (!isCloudPath(current)) return wx.previewImage({ current, urls: images.filter(image => !isCloudPath(image)), showMenu: true });
+    wx.cloud.getTempFileURL({
+      fileList: images,
+      success: result => {
+        const urls = (result.fileList || []).filter(file => file.status === 0 && file.tempFileURL).map(file => file.tempFileURL);
+        if (!urls.length) return wx.showToast({ title: '图片暂时无法读取', icon: 'none' });
+        const matching = (result.fileList || []).find(file => file.fileID === current);
+        wx.previewImage({ current: matching && matching.tempFileURL || urls[0], urls, showMenu: true });
+      },
+      fail: () => wx.showToast({ title: '图片暂时无法读取', icon: 'none' })
+    });
+  },
+  fileActions(e) {
+    const file = e.currentTarget.dataset.file;
+    if (!file) return;
+    if (file.status === 'needs_source') return wx.showModal({ title: '原件未保存', content: file.reason || '请回到“记录”页重新选择并保存原件。', showCancel: false });
+    wx.showActionSheet({
+      itemList: ['打开 / 转发 / 用其他应用', '复制文件名'],
+      success: result => {
+        if (result.tapIndex === 0) this.openFile(file);
+        if (result.tapIndex === 1) wx.setClipboardData({ data: file.name || '', success: () => wx.showToast({ title: '文件名已复制', icon: 'success' }) });
+      }
+    });
+  },
+  openFile(file) {
+    if (file.localFilePath) return wx.openDocument({ filePath: file.localFilePath, showMenu: true, fail: () => wx.showToast({ title: '本机附件暂时无法打开', icon: 'none' }) });
+    if (!file.cloudFileID) return wx.showToast({ title: '找不到可打开的附件原件', icon: 'none' });
+    wx.cloud.downloadFile({ fileID: file.cloudFileID, success: result => wx.openDocument({ filePath: result.tempFilePath, showMenu: true }), fail: () => wx.showToast({ title: '云端附件暂时无法打开', icon: 'none' }) });
   },
   copySummary(e) {
     const folder = this.data.folders.find(item => item.key === e.currentTarget.dataset.key);

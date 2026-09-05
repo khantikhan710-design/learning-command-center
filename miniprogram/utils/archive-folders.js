@@ -41,4 +41,11 @@ function toggleFolderOpen(open, key) {
   };
 }
 
-module.exports = { buildMonthlyFolders, monthKey, toggleFolderOpen };
+function buildRecordClipboardText(record) {
+  return [record && record.title, record && record.content]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+module.exports = { buildMonthlyFolders, monthKey, toggleFolderOpen, buildRecordClipboardText };
