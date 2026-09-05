@@ -3,10 +3,16 @@ const { mergeCategories, buildFolders } = require('../../utils/study-folders');
 const { getPreviewUrls, currentPreviewUrl } = require('../../utils/evidence-links');
 const { formatRecordDate } = require('../../utils/date-display');
 const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft } = require('../../utils/study-material-cards');
-const { isCloudPath, saveLocalImages, saveLocalFiles } = require('../../utils/local-attachments');
+const { isCloudPath, saveLocalImages, saveLocalFilesWithStatus } = require('../../utils/local-attachments');
 const { removeAttachment } = require('../../utils/record-attachments');
 const defaults = ['考研数学', '专业基础', '硬件电路', '英语', 'AI学习'];
 const sort = records => [...records].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
+const SOURCE_GUIDES = {
+  Goodnotes: { kind: 'file', action: '选择文件', content: '请先在 Goodnotes 导出 PDF 到微信文件传输助手，再回到这里选择该文件。小程序不能直接读取 Goodnotes 内的笔记。' },
+  'WPS 扫描': { kind: 'file', action: '选择文件', content: '请先在 WPS 中把 PDF/Word 分享到微信文件传输助手，再回到这里选择该文件。纸质扫描照片可改用“图片”。' },
+  '纸质拍照': { kind: 'image', action: '添加图片', content: '现在可从相册选择纸质题目照片。图片只有保存成功后才会成为资料卡附件。' },
+  其他: { kind: '', action: '知道了', content: '可以只记录文字，也可以用“PDF / Word”从微信文件传输助手选择已有资料。' }
+};
 
 Page({
   data: { subject: '考研数学', categories: defaults, source: 'Goodnotes', sources: MATERIAL_SOURCES, title: '', content: '', images: [], files: [], records: [], folders: [], open: {}, activeRecordId: '', focusRecordId: '', touchStartX: 0 },
@@ -28,7 +34,7 @@ Page({
   setRecords(records) {
     records = sort(records).map(record => ({
       ...record,
-      files: (record.files || []).map((file, index) => ({ ...file, attachmentId: file.attachmentId || file.cloudFileID || file.localFilePath || file.path || `${record.id}-${index}` })),
+      files: (record.files || []).map((file, index) => ({ ...file, status: file.status || 'saved', attachmentId: file.attachmentId || file.cloudFileID || file.localFilePath || file.path || `${record.id}-${index}` })),
       source: normalizeMaterialSource(record.source), displayTitle: materialTitle(record), displayDate: formatRecordDate(record.date)
     }));
     wx.setStorageSync('studyRecords', records);
@@ -41,7 +47,19 @@ Page({
   },
   pickSubject(e) { this.setData({ subject: e.currentTarget.dataset.s }); },
   chooseSource() {
-    wx.showActionSheet({ itemList: this.data.sources, success: result => this.setData({ source: this.data.sources[result.tapIndex] }) });
+    wx.showActionSheet({ itemList: this.data.sources, success: result => {
+      const source = this.data.sources[result.tapIndex];
+      this.setData({ source });
+      this.showSourceGuide(source);
+    }});
+  },
+  showSourceGuide(source) {
+    const guide = SOURCE_GUIDES[source] || SOURCE_GUIDES.其他;
+    wx.showModal({ title: '来源导入提示', content: guide.content, confirmText: guide.action, cancelText: '仅标记', success: result => {
+      if (!result.confirm) return;
+      if (guide.kind === 'image') this.chooseImage();
+      if (guide.kind === 'file') this.chooseFile();
+    }});
   },
   addCategory() {
     wx.showModal({ title: '新增分类', editable: true, placeholderText: '例如：模电专题', success: result => {
@@ -66,22 +84,39 @@ Page({
     const hasText = this.data.title.trim() || this.data.content.trim();
     const hasAttachments = this.data.images.length || this.data.files.length;
     if (!hasText && !hasAttachments) return wx.showToast({ title: '写内容或添加附件', icon: 'none' });
-    const makeRecord = (images = [], files = []) => ({ id: Date.now(), subject: this.data.subject, source: normalizeMaterialSource(this.data.source), title: this.data.title.trim(), content: this.data.content, images, files: files.map((file, index) => ({ ...file, attachmentId: file.cloudFileID || file.localFilePath || file.path || String(index) })), date: new Date().toLocaleString('zh-CN'), pinned: false });
+    const makeRecord = (images = [], files = []) => ({ id: Date.now(), subject: this.data.subject, source: normalizeMaterialSource(this.data.source), title: this.data.title.trim(), content: this.data.content, images, files: files.map((file, index) => ({ ...file, status: file.status || 'saved', attachmentId: file.attachmentId || file.cloudFileID || file.localFilePath || file.path || String(index) })), date: new Date().toLocaleString('zh-CN'), pinned: false });
     const finish = (record, message = '资料卡已保存') => {
       this.persist([record, ...this.data.records]);
       this.setData({ title: '', content: '', images: [], files: [] });
       wx.showToast({ title: message, icon: 'success' });
     };
     if (!hasAttachments) return finish(makeRecord());
+    const confirmKeepSourceOnly = (images, files, placeholders, missingImages = 0) => {
+      const unavailable = placeholders.map(file => `${file.name}：${file.reason}`);
+      if (missingImages) unavailable.push(`${missingImages} 张图片未保存到小程序`);
+      wx.showModal({
+        title: '部分附件未保存',
+        content: `${unavailable.join('\n')}\n\n可保留资料卡正文与原件提示；请继续保留 Goodnotes/WPS 中的原文件。`,
+        cancelText: '不保存', confirmText: '保留正文',
+        success: result => { if (result.confirm) finish(makeRecord(images, [...files, ...placeholders]), '资料卡已保存，原件未保存'); }
+      });
+    };
     Promise.all([cloudStore.uploadImages(this.data.images), cloudStore.uploadFiles(this.data.files)])
       .then(([images, files]) => finish(makeRecord(images, files)))
-      .catch(() => Promise.all([saveLocalImages(this.data.images), saveLocalFiles(this.data.files)])
-        .then(([images, files]) => finish(makeRecord(images, files), '附件已保存到本机'))
-        .catch(() => wx.showModal({
-          title: '附件未保存',
-          content: '云端和本机文件保存都失败了。请检查手机存储空间后重试。',
-          showCancel: false
-        })));
+      .catch(cloudError => {
+        console.warn('[attachment] cloud save failed; trying local storage', cloudError);
+        return Promise.all([
+          Promise.allSettled(this.data.images.map(image => saveLocalImages([image]))),
+          saveLocalFilesWithStatus(this.data.files)
+        ]).then(([imageResults, fileResult]) => {
+          const images = imageResults.filter(result => result.status === 'fulfilled').map(result => result.value[0]);
+          const missingImages = imageResults.length - images.length;
+          imageResults.filter(result => result.status === 'rejected').forEach(result => console.warn('[attachment] local image save failed', result.reason));
+          fileResult.placeholders.forEach(file => console.warn('[attachment] local file save failed', file.name, file.reason));
+          if (fileResult.placeholders.length || missingImages) return confirmKeepSourceOnly(images, fileResult.files, fileResult.placeholders, missingImages);
+          finish(makeRecord(images, fileResult.files), '附件已保存到本机');
+        });
+      });
   },
   createReview(e) {
     const record = this.data.records.find(item => item.id === e.currentTarget.dataset.id);

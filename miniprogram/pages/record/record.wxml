@@ -6,7 +6,7 @@
       <text class="pill new-category" bindtap="addCategory">＋ 新增分类</text>
     </view>
     <view class="material-meta">
-      <text class="source-chip" bindtap="chooseSource">来源：{{source}} · 选择</text>
+      <text class="source-chip" bindtap="chooseSource">来源：{{source}} · 选择/导入</text>
       <input class="input material-title" value="{{title}}" placeholder="资料标题，例如：积分中值定理错题第 3 组" bindinput="inputTitle" />
     </view>
     <textarea class="input note" value="{{content}}" placeholder="记录题数、正确率、薄弱点……" bindinput="input"/>
@@ -30,7 +30,7 @@
                 <text class="copy-text" data-id="{{record.id}}" catchtap="createReview">转为复盘</text>
                 <text class="copy-text" data-id="{{record.id}}" catchtap="openRecordActions">管理</text>
                 <view class="thumbs"><image wx:for="{{record.images}}" wx:for-item="image" wx:key="*this" src="{{image}}" mode="aspectFill" data-image="{{image}}" data-images="{{record.images}}" bindtap="previewRecordImage"/></view>
-                <view wx:for="{{record.files}}" wx:for-item="file" wx:key="attachmentId" class="file" data-f="{{file}}" data-record-id="{{record.id}}" bindtap="fileActions">📎 {{file.name}} · 打开/转发/删除</view>
+                <view wx:for="{{record.files}}" wx:for-item="file" wx:key="attachmentId" class="file {{file.status==='needs_source'?'file-unavailable':''}}" data-f="{{file}}" data-record-id="{{record.id}}" bindtap="fileActions">📎 {{file.name}} · {{file.status==='needs_source'?'原件未保存 · 重选/删除':'打开/转发/删除'}}<text wx:if="{{file.status==='needs_source'}}" class="file-reason">{{file.reason}}</text></view>
               </view>
             </view>
             <view wx:if="{{activeRecordId===record.id}}" class="record-actions"><view class="action pin" data-id="{{record.id}}" bindtap="pin">{{record.pinned?'取消置顶':'置顶'}}</view><view class="action delete" data-id="{{record.id}}" bindtap="remove">删除</view></view>
