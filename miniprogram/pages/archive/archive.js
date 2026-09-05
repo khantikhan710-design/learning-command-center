@@ -1,16 +1,17 @@
 const cloudStore = require('../../utils/cloud-store');
-const { buildMonthlyFolders, toggleFolderOpen, buildRecordClipboardText } = require('../../utils/archive-folders');
+const { buildMonthlyFolders, toggleFolderOpen, buildRecordClipboardText, filterRecordsBySource, updateRecordById } = require('../../utils/archive-folders');
 const { formatRecordDate } = require('../../utils/date-display');
 const { isCloudPath } = require('../../utils/local-attachments');
 const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
-const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
+const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup, backupFileName } = require('../../utils/local-backup');
 const { buildFocusDashboard } = require('../../utils/focus-statistics');
-const { getBackupStatus } = require('../../utils/backup-status');
-const { buildWeeklyReview } = require('../../utils/weekly-review');
+const { getBackupStatus, buildLocalSafetyStatus } = require('../../utils/backup-status');
+const { buildWeeklyReview, buildWeeklyReport } = require('../../utils/weekly-review');
 const { buildReviewCoach } = require('../../utils/review-coach');
 const { dueReviews } = require('../../utils/review-status');
 const { buildReminderState } = require('../../utils/reminder-state');
 const { KNOWLEDGE_SOURCES } = require('../../utils/knowledge-sources');
+const { createReviewDraft } = require('../../utils/study-material-cards');
 
 Page({
   data: {
@@ -19,7 +20,9 @@ Page({
     weeklyStats: { totalMinutes: 0, daily: [], subjects: [], tasks: [] },
     weeklyReview: { plan: { total: 0, completed: 0, percent: 0 }, totalMinutes: 0, subjects: [], weakTopics: [], streak: 0 },
     reminderState: { dueCount: 0, title: '今天没有到期复盘', message: '本机提醒已启用；微信订阅消息待配置。', subscription: '未配置' },
-    knowledgeSources: KNOWLEDGE_SOURCES
+    knowledgeSources: KNOWLEDGE_SOURCES,
+    cloudStatus: { state: 'unknown', title: '云同步尚未检测', message: '当前以本机数据为准；可手动检测云连接。' },
+    localSafety: { needsBackup: true, unsavedFiles: 0, oversizedFiles: 0 }, weeklyReport: '', archiveSource: '全部', archiveSourceOptions: ['全部']
   },
   onShow() {
     const localRecords = wx.getStorageSync('studyRecords') || [];
@@ -32,7 +35,10 @@ Page({
       weeklyStats: buildFocusDashboard(sessions),
       weeklyReview: buildWeeklyReview({ tasks: localTasks, sessions, reviews: localReviews, activityDates }),
       reminderState: buildReminderState({ dueCount: dueReviews(localReviews).length, missedDays: reviewCoach.missedDays }),
-      backupStatus: this.readBackupStatus()
+      backupStatus: this.readBackupStatus(),
+      cloudStatus: cloudStore.getCloudStatus(),
+      localSafety: buildLocalSafetyStatus({ backupAt: wx.getStorageSync('lastLocalBackupAt'), records: localRecords }),
+      weeklyReport: buildWeeklyReport(buildWeeklyReview({ tasks: localTasks, sessions, reviews: localReviews, activityDates }))
     });
     this.setEntries(localRecords, localReviews, localTasks);
     Promise.all([cloudStore.loadSnapshot('records'), cloudStore.loadSnapshot('reviews'), cloudStore.loadTaskState()]).then(([records, reviews, taskState]) => {
@@ -41,7 +47,10 @@ Page({
     }).catch(() => {});
   },
   setEntries(records, reviews, tasks) {
-    const folders = buildMonthlyFolders(records, reviews, tasks).map(folder => ({
+    this.rawEntries = { records, reviews, tasks };
+    const archiveSourceOptions = ['全部', ...new Set(records.map(record => record.source).filter(Boolean))];
+    const archiveSource = archiveSourceOptions.includes(this.data.archiveSource) ? this.data.archiveSource : '全部';
+    const folders = buildMonthlyFolders(filterRecordsBySource(records, archiveSource), reviews, tasks).map(folder => ({
       ...folder,
       records: folder.records.map(record => ({
         ...record,
@@ -53,7 +62,7 @@ Page({
       reviews: folder.reviews.map(review => ({ ...review, displayDate: review.created || review.masteredAt || '未记录时间' })),
       tasks: folder.tasks.map(task => ({ ...task, statusLabel: task.done ? '已完成' : '未完成' }))
     }));
-    this.setData({ folders });
+    this.setData({ folders, archiveSource, archiveSourceOptions });
   },
   toggleFolder(e) {
     const key = e.currentTarget.dataset.key;
@@ -97,6 +106,35 @@ Page({
     if (!file.cloudFileID) return wx.showToast({ title: '找不到可打开的附件原件', icon: 'none' });
     wx.cloud.downloadFile({ fileID: file.cloudFileID, success: result => wx.openDocument({ filePath: result.tempFilePath, showMenu: true }), fail: () => wx.showToast({ title: '云端附件暂时无法打开', icon: 'none' }) });
   },
+  chooseArchiveSource() {
+    wx.showActionSheet({ itemList: this.data.archiveSourceOptions, success: result => {
+      const archiveSource = this.data.archiveSourceOptions[result.tapIndex];
+      this.setData({ archiveSource }, () => {
+        const entries = this.rawEntries || { records: [], reviews: [], tasks: [] };
+        this.setEntries(entries.records, entries.reviews, entries.tasks);
+      });
+    }});
+  },
+  manageRecord(e) {
+    const record = e.currentTarget.dataset.record;
+    if (!record) return;
+    wx.showActionSheet({ itemList: [record.pinned ? '取消置顶' : '置顶', '转为复盘', '删除资料卡'], success: result => {
+      if (result.tapIndex === 0) return this.persistArchiveRecords(updateRecordById(this.rawEntries.records, record.id, item => ({ ...item, pinned: !item.pinned })));
+      if (result.tapIndex === 1) {
+        wx.setStorageSync('reviewDraftFromRecord', createReviewDraft(record));
+        return wx.switchTab({ url: '/pages/review/review' });
+      }
+      wx.showModal({ title: '删除资料卡？', content: '删除后无法恢复。', confirmColor: '#e65050', success: confirm => {
+        if (confirm.confirm) this.persistArchiveRecords(this.rawEntries.records.filter(item => String(item.id) !== String(record.id)));
+      }});
+    }});
+  },
+  persistArchiveRecords(records) {
+    wx.setStorageSync('studyRecords', records);
+    const entries = this.rawEntries || { reviews: [], tasks: [] };
+    this.setEntries(records, entries.reviews, entries.tasks);
+    cloudStore.saveSnapshot('records', records).catch(() => this.setData({ cloudStatus: cloudStore.getCloudStatus() }));
+  },
   copySummary(e) {
     const folder = this.data.folders.find(item => item.key === e.currentTarget.dataset.key);
     if (!folder) return;
@@ -114,6 +152,16 @@ Page({
     const source = this.data.knowledgeSources.find(item => item.id === e.currentTarget.dataset.id);
     if (!source || !source.url) return wx.showToast({ title: '请通过自己的资料卡补充该来源', icon: 'none' });
     wx.setClipboardData({ data: source.url, success: () => wx.showToast({ title: '来源链接已复制', icon: 'success' }) });
+  },
+  checkCloud() {
+    wx.showLoading({ title: '检测中' });
+    cloudStore.checkConnection().then(() => wx.showToast({ title: '云同步可用', icon: 'success' })).catch(() => wx.showToast({ title: '云开发不可用', icon: 'none' })).finally(() => {
+      wx.hideLoading();
+      this.setData({ cloudStatus: cloudStore.getCloudStatus() });
+    });
+  },
+  copyWeeklyReport() {
+    wx.setClipboardData({ data: this.data.weeklyReport, success: () => wx.showToast({ title: '本周报告已复制', icon: 'success' }) });
   },
   readBackupStorage() {
     return STORAGE_KEYS.reduce((storage, key) => {
@@ -134,6 +182,27 @@ Page({
         wx.showToast({ title: '备份已复制', icon: 'success' });
       }
     });
+  },
+  exportBackupFile() {
+    const text = createBackup(this.readBackupStorage());
+    const name = backupFileName();
+    const path = `${wx.env.USER_DATA_PATH}/${name}`;
+    wx.getFileSystemManager().writeFile({ filePath: path, data: text, encoding: 'utf8', success: () => {
+      wx.setStorageSync('lastLocalBackupAt', new Date().toISOString());
+      this.setData({ backupStatus: this.readBackupStatus(), localSafety: buildLocalSafetyStatus({ backupAt: wx.getStorageSync('lastLocalBackupAt'), records: wx.getStorageSync('studyRecords') || [] }) });
+      if (typeof wx.shareFileMessage === 'function') return wx.shareFileMessage({ filePath: path, fileName: name, success: () => wx.showToast({ title: '备份文件已发起转发', icon: 'success' }), fail: () => wx.showToast({ title: '文件已生成，可用复制备份', icon: 'none' }) });
+      wx.setClipboardData({ data: text, success: () => wx.showToast({ title: '当前环境不支持转发，已复制', icon: 'none' }) });
+    }, fail: () => wx.showToast({ title: '备份文件生成失败', icon: 'none' }) });
+  },
+  chooseBackupFile() {
+    wx.chooseMessageFile({ count: 1, type: 'file', success: result => {
+      const file = (result.tempFiles || [])[0];
+      if (!file) return;
+      wx.getFileSystemManager().readFile({ filePath: file.path, encoding: 'utf8', success: read => {
+        this.setData({ showRestore: true, backupText: read.data, backupPreview: null });
+        this.previewRestore();
+      }, fail: () => wx.showToast({ title: '无法读取备份文件', icon: 'none' }) });
+    }});
   },
   toggleRestore() {
     this.setData({ showRestore: !this.data.showRestore, backupText: '', backupPreview: null });

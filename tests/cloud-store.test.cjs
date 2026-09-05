@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { ENV_ID, collectionFor } = require('../miniprogram/utils/cloud-store');
+const { ENV_ID, collectionFor, normalizeCloudStatus } = require('../miniprogram/utils/cloud-store');
 
 assert.equal(ENV_ID, 'study-command-doc-d4ddzc7244fd32');
 assert.equal(collectionFor('tasks'), 'study_tasks');
@@ -15,4 +15,7 @@ const cloudFunctionSource = fs.readFileSync(require.resolve('../cloudfunctions/s
 assert.match(cloudFunctionSource, /event\.name === 'tasks'/);
 assert.match(cloudFunctionSource, /Array\.isArray\(event\.items\.tasks\)/);
 assert.match(cloudFunctionSource, /Array\.isArray\(event\.items\.categories\)/);
+assert.deepEqual(normalizeCloudStatus(null), { state: 'unknown', title: '云同步尚未检测', message: '当前以本机数据为准；可手动检测云连接。' });
+assert.equal(normalizeCloudStatus({ state: 'offline', error: 'errCode: -601034' }).title, '本机模式');
+assert.equal(normalizeCloudStatus({ state: 'available' }).message, '云同步可用；本机仍保留一份副本。');
 console.log('cloud store configuration tests passed');

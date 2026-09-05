@@ -1,9 +1,21 @@
 const ENV_ID = 'study-command-doc-d4ddzc7244fd32';
+const CLOUD_STATUS_KEY = 'studyCloudStatus';
 const collections = { tasks: 'study_tasks', records: 'study_records', reviews: 'study_reviews', focus: 'study_focus_sessions' };
 
 function collectionFor(name) { return collections[name]; }
+function normalizeCloudStatus(status) {
+  if (status && status.state === 'available') return { state: 'available', title: '云同步可用', message: '云同步可用；本机仍保留一份副本。' };
+  if (status && status.state === 'offline') return { state: 'offline', title: '本机模式', message: '云开发暂不可用，学习数据只保存在当前设备。', error: status.error || '' };
+  return { state: 'unknown', title: '云同步尚未检测', message: '当前以本机数据为准；可手动检测云连接。' };
+}
+function getCloudStatus(api = wx) { return normalizeCloudStatus(api.getStorageSync(CLOUD_STATUS_KEY)); }
+function saveCloudStatus(status, api = wx) { api.setStorageSync(CLOUD_STATUS_KEY, status); return normalizeCloudStatus(status); }
+function markCloudAvailable(api = wx) { return saveCloudStatus({ state: 'available', checkedAt: Date.now() }, api); }
+function markCloudUnavailable(error, api = wx) { return saveCloudStatus({ state: 'offline', checkedAt: Date.now(), error: String(error && (error.errMsg || error.message) || error || '') }, api); }
 function callData(action, name, data = {}) {
-  return wx.cloud.callFunction({ name: 'studyData', data: { action, name, ...data } }).then(result => result.result);
+  return wx.cloud.callFunction({ name: 'studyData', data: { action, name, ...data } })
+    .then(result => { markCloudAvailable(); return result.result; })
+    .catch(error => { markCloudUnavailable(error); throw error; });
 }
 
 function loadSnapshot(name) {
@@ -25,6 +37,7 @@ function saveTaskState(state) {
 function addFocusSession(data) {
   return callData('addFocus', 'focus', { data });
 }
+function checkConnection() { return callData('load', 'tasks').then(() => getCloudStatus()); }
 
 function uploadImages(paths) {
   return Promise.all(paths.map((path, index) => {
@@ -41,4 +54,4 @@ function uploadFiles(files) {
   })));
 }
 
-module.exports = { ENV_ID, collectionFor, loadSnapshot, saveSnapshot, loadTaskState, saveTaskState, addFocusSession, uploadImages, uploadFiles };
+module.exports = { ENV_ID, collectionFor, normalizeCloudStatus, getCloudStatus, markCloudAvailable, markCloudUnavailable, loadSnapshot, saveSnapshot, loadTaskState, saveTaskState, addFocusSession, checkConnection, uploadImages, uploadFiles };

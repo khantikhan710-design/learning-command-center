@@ -48,4 +48,13 @@ function buildRecordClipboardText(record) {
     .join('\n');
 }
 
-module.exports = { buildMonthlyFolders, monthKey, toggleFolderOpen, buildRecordClipboardText };
+function filterRecordsBySource(records, source) {
+  if (!source || source === '全部') return records || [];
+  return (records || []).filter(record => record.source === source);
+}
+
+function updateRecordById(records, id, update) {
+  return (records || []).map(record => String(record.id) === String(id) ? update(record) : record);
+}
+
+module.exports = { buildMonthlyFolders, monthKey, toggleFolderOpen, buildRecordClipboardText, filterRecordsBySource, updateRecordById };

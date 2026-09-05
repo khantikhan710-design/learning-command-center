@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { buildMonthlyFolders, toggleFolderOpen, buildRecordClipboardText } = require('../miniprogram/utils/archive-folders');
+const { buildMonthlyFolders, toggleFolderOpen, buildRecordClipboardText, filterRecordsBySource, updateRecordById } = require('../miniprogram/utils/archive-folders');
 
 const folders = buildMonthlyFolders(
   [{ id: 'r1', date: '2026-09-03T04:30:00.000Z', content: '节点电压法' }, { id: 'r2', date: '2026-08-20T04:30:00.000Z', content: '模电' }],
@@ -17,4 +17,6 @@ assert.deepEqual(toggleFolderOpen({}, '2026-09'), { '2026-09': true });
 assert.deepEqual(toggleFolderOpen({ '2026-09': true }, '2026-09'), { '2026-09': false });
 assert.equal(buildRecordClipboardText({ title: '节点法例题', content: '列 KCL 方程后联立求解' }), '节点法例题\n列 KCL 方程后联立求解');
 assert.equal(buildRecordClipboardText({ title: '', content: '仅有正文' }), '仅有正文');
+assert.equal(filterRecordsBySource([{ id: 'a', source: 'Goodnotes' }, { id: 'b', source: 'WPS 扫描' }], 'Goodnotes').length, 1);
+assert.deepEqual(updateRecordById([{ id: 'a', pinned: false }], 'a', record => ({ ...record, pinned: true })), [{ id: 'a', pinned: true }]);
 console.log('archive folder tests passed');

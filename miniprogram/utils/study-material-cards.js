@@ -22,4 +22,10 @@ function createReviewDraft(record) {
   };
 }
 
-module.exports = { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft };
+function createSourceImportDraft(source, file) {
+  const normalized = normalizeMaterialSource(source);
+  const name = String(file && file.name || '').replace(/\.[^.]+$/, '').trim();
+  return { source: normalized, title: name, dateHint: `已从 ${normalized}导入文件` };
+}
+
+module.exports = { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft, createSourceImportDraft };

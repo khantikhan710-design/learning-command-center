@@ -35,6 +35,10 @@
 <view class="insight-content">{{insight.content}}</view>
 <view class="insight-source">来源 · {{insight.source}}</view>
 </view>
+<view class="card cloud-status {{cloudStatus.state==='offline'?'cloud-offline':''}}">
+<view><view class="cloud-title">{{cloudStatus.title}}</view><view class="muted">{{cloudStatus.message}}</view></view>
+<button size="mini" bindtap="checkCloud">检测</button>
+</view>
 <view class="card next-step">
 <view class="next-kicker">现在做什么</view>
 <view class="next-title">{{dailyPlan.action.title}}</view>

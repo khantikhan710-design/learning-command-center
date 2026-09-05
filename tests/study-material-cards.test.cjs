@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft } = require('../miniprogram/utils/study-material-cards');
+const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft, createSourceImportDraft } = require('../miniprogram/utils/study-material-cards');
 
 assert.deepEqual(MATERIAL_SOURCES, ['Goodnotes', 'WPS 扫描', '纸质拍照', '其他']);
 assert.equal(normalizeMaterialSource('Goodnotes'), 'Goodnotes');
@@ -17,4 +17,5 @@ assert.deepEqual(createReviewDraft({ id: 'r2', content: '' }), {
   sourceLabel: '其他',
   content: '【资料卡｜其他】未命名资料卡'
 });
+assert.deepEqual(createSourceImportDraft('WPS 扫描', { name: '9月模电错题.pdf' }), { source: 'WPS 扫描', title: '9月模电错题', dateHint: '已从 WPS 扫描导入文件' });
 console.log('study material card tests passed');

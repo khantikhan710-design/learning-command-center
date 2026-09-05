@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { buildWeeklyReview } = require('../miniprogram/utils/weekly-review');
+const { buildWeeklyReview, buildWeeklyReport } = require('../miniprogram/utils/weekly-review');
 
 const now = new Date('2026-09-05T12:00:00+08:00');
 const summary = buildWeeklyReview({
@@ -31,4 +31,6 @@ assert.equal(summary.streak, 3);
 const empty = buildWeeklyReview({ tasks: [], sessions: [], reviews: [], activityDates: [], now });
 assert.deepEqual(empty.plan, { total: 0, completed: 0, percent: 0 });
 assert.deepEqual(empty.weakTopics, []);
+assert.match(buildWeeklyReport(summary), /本周学习复盘/);
+assert.match(buildWeeklyReport(summary), /下周第一步/);
 console.log('weekly review tests passed');

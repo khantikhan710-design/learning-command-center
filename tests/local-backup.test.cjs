@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { createBackup, parseBackup, summarizeBackup } = require('../miniprogram/utils/local-backup');
+const { createBackup, parseBackup, summarizeBackup, backupFileName } = require('../miniprogram/utils/local-backup');
 
 const storage = {
   studyTasks: [{ id: 't1', title: '电路刷题' }],
@@ -27,4 +27,5 @@ const blankStorageBackup = parseBackup(createBackup({ studyTasks: '', focusMinut
 assert.deepEqual(summarizeBackup(blankStorageBackup), { tasks: 0, records: 0, reviews: 0, focusMinutes: 0 });
 assert.throws(() => parseBackup('{bad json'), /备份内容不是有效 JSON/);
 assert.throws(() => parseBackup(JSON.stringify({ format: 'other-app', data: {} })), /不是学习指挥台备份/);
+assert.equal(backupFileName(new Date('2026-09-05T12:00:00.000Z')), '学习指挥台备份-2026-09-05.json');
 console.log('local backup tests passed');

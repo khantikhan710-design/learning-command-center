@@ -48,4 +48,8 @@ function summarizeBackup(backup) {
   };
 }
 
-module.exports = { BACKUP_FORMAT, STORAGE_KEYS, createBackup, parseBackup, summarizeBackup };
+function backupFileName(date = new Date()) {
+  return `学习指挥台备份-${date.toISOString().slice(0, 10)}.json`;
+}
+
+module.exports = { BACKUP_FORMAT, STORAGE_KEYS, createBackup, parseBackup, summarizeBackup, backupFileName };

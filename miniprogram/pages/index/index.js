@@ -18,6 +18,7 @@ Page({
     tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0, reviewCoach: {}, reminderState: { dueCount: 0, title: '', message: '', subscription: '未配置' },
     newTask: '', date: '', activeTaskId: '', touchStartX: 0, draggingTaskId: '', dragTargetId: '', dragOffsetY: 0, categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
     insight: { type: '学习思考', title: '把注意力放回今天能完成的一步', content: '先完成一轮可验证的练习，再记录卡点。', source: '学习方法摘记' },
+    cloudStatus: { state: 'unknown', title: '云同步尚未检测', message: '当前以本机数据为准；可手动检测云连接。' },
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
   },
 
@@ -31,7 +32,8 @@ Page({
     wx.setStorageSync('studyInsightCursor', refreshedInsight.nextIndex);
     this.setData({
       date: today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }),
-      insight: refreshedInsight.insight
+      insight: refreshedInsight.insight,
+      cloudStatus: cloudStore.getCloudStatus()
     });
     this.load();
     cloudStore.loadTaskState().then(snapshot => {
@@ -41,7 +43,7 @@ Page({
       wx.setStorageSync('studyTasks', normalizeTaskSubjects(state.tasks));
       wx.setStorageSync('studyTaskCategories', normalizeTaskCategories(state.categories));
       this.load();
-    }).catch(() => {});
+    }).catch(() => this.setData({ cloudStatus: cloudStore.getCloudStatus() }));
   },
 
   loadLocalState() {
@@ -85,9 +87,16 @@ Page({
     const cleanCategories = normalizeTaskCategories(categories);
     wx.setStorageSync('studyTasks', sorted);
     wx.setStorageSync('studyTaskCategories', cleanCategories);
-    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories }).catch(() => {});
+    cloudStore.saveTaskState({ tasks: sorted, categories: cleanCategories }).catch(() => this.setData({ cloudStatus: cloudStore.getCloudStatus() }));
     this.setData({ activeTaskId: '' });
     this.load();
+  },
+  checkCloud() {
+    wx.showLoading({ title: '检测中' });
+    cloudStore.checkConnection().then(() => wx.showToast({ title: '云同步可用', icon: 'success' })).catch(() => wx.showToast({ title: '当前为本机模式', icon: 'none' })).finally(() => {
+      wx.hideLoading();
+      this.setData({ cloudStatus: cloudStore.getCloudStatus() });
+    });
   },
 
   toggle(e) {

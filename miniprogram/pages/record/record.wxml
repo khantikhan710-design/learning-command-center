@@ -20,6 +20,7 @@
 <button class="photo-btn" bindtap="chooseFile">＋ PDF / Word</button>
 </view>
     <view wx:for="{{files}}" wx:key="path" class="file">📎 {{item.name}}</view>
+    <view wx:if="{{importHint}}" class="import-hint">{{importHint}}：已预填标题和来源，请补充学习内容后保存。</view>
     <button class="primary" bindtap="save">保存资料卡</button>
   </view>
   <view class="section-title">学习收藏夹</view>

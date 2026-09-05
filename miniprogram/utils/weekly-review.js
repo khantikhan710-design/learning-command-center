@@ -47,4 +47,11 @@ function buildWeeklyReview({ tasks = [], sessions = [], reviews = [], activityDa
   };
 }
 
-module.exports = { buildWeeklyReview };
+function buildWeeklyReport(summary) {
+  const subjects = summary.subjects.length ? summary.subjects.map(item => `${item.name} ${item.minutes} 分钟（${item.percent}%）`).join('；') : '暂无专注记录';
+  const weak = summary.weakTopics.length ? summary.weakTopics.map(item => `${item.name}（${item.dueCount} 条到期）`).join('、') : '暂无到期薄弱项';
+  const next = summary.weakTopics[0] ? `优先复盘“${summary.weakTopics[0].name}”的到期内容。` : summary.subjects[0] ? `延续“${summary.subjects[0].name}”的学习节奏，并补一条复盘。` : '先安排一项 25 分钟的最小学习任务。';
+  return `本周学习复盘\n计划完成：${summary.plan.completed}/${summary.plan.total}（${summary.plan.percent}%）\n专注投入：${summary.totalMinutes} 分钟\n科目投入：${subjects}\n薄弱知识点：${weak}\n连续复习：${summary.streak} 天\n下周第一步：${next}`;
+}
+
+module.exports = { buildWeeklyReview, buildWeeklyReport };
