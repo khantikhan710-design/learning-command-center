@@ -4,7 +4,7 @@ const { getPreviewUrls, currentPreviewUrl } = require('../../utils/evidence-link
 const { formatRecordDate } = require('../../utils/date-display');
 const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft } = require('../../utils/study-material-cards');
 const { isCloudPath, saveLocalImages, saveLocalFilesWithStatus } = require('../../utils/local-attachments');
-const { removeAttachment } = require('../../utils/record-attachments');
+const { removeAttachment, replaceAttachment } = require('../../utils/record-attachments');
 const defaults = ['考研数学', '专业基础', '硬件电路', '英语', 'AI学习'];
 const sort = records => [...records].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 const SOURCE_GUIDES = {
@@ -139,12 +139,32 @@ Page({
   fileActions(e) {
     const file = e.currentTarget.dataset.f;
     const recordId = e.currentTarget.dataset.recordId;
-    wx.showActionSheet({ itemList: ['打开、转发或用其他应用', '复制文件名', '删除这份附件'], success: result => {
-      if (result.tapIndex === 0) this.openFile(file);
+    const needsSource = file.status === 'needs_source';
+    wx.showActionSheet({ itemList: needsSource ? ['重新选择原件并保存', '复制文件名', '删除这份附件'] : ['打开、转发或用其他应用', '复制文件名', '删除这份附件'], success: result => {
+      if (result.tapIndex === 0 && needsSource) this.replaceSourceAttachment(recordId, file.attachmentId);
+      if (result.tapIndex === 0 && !needsSource) this.openFile(file);
       if (result.tapIndex === 1) wx.setClipboardData({ data: file.name || '', success: () => wx.showToast({ title: '文件名已复制', icon: 'success' }) });
       if (result.tapIndex === 2) wx.showModal({
         title: '删除这份附件？', content: '只删除附件，不删除资料卡正文。', confirmColor: '#e65050',
         success: confirm => { if (confirm.confirm) this.persist(removeAttachment(this.data.records, recordId, file.attachmentId)); }
+      });
+    }});
+  },
+  replaceSourceAttachment(recordId, attachmentId) {
+    wx.chooseMessageFile({ count: 1, type: 'file', success: result => {
+      const [selected] = result.tempFiles || [];
+      if (!selected) return;
+      cloudStore.uploadFiles([selected]).then(([file]) => {
+        this.persist(replaceAttachment(this.data.records, recordId, attachmentId, { ...file, status: 'saved', attachmentId: file.cloudFileID }));
+        wx.showToast({ title: '附件已保存', icon: 'success' });
+      }).catch(cloudError => {
+        console.warn('[attachment] cloud replacement failed; trying local storage', cloudError);
+        saveLocalFilesWithStatus([selected]).then(result => {
+          const [file] = result.files;
+          if (!file) return wx.showModal({ title: '原件仍未保存', content: result.placeholders[0] ? result.placeholders[0].reason : '无法保存该文件，请保留原件后重试。', showCancel: false });
+          this.persist(replaceAttachment(this.data.records, recordId, attachmentId, file));
+          wx.showToast({ title: '附件已保存到本机', icon: 'success' });
+        });
       });
     }});
   },
