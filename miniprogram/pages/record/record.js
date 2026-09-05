@@ -5,6 +5,7 @@ const { formatRecordDate } = require('../../utils/date-display');
 const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft } = require('../../utils/study-material-cards');
 const { isCloudPath, saveLocalImages, saveLocalFilesWithStatus } = require('../../utils/local-attachments');
 const { removeAttachment, replaceAttachment } = require('../../utils/record-attachments');
+const { monthKey, buildFilterOptions, filterStudyItems } = require('../../utils/study-filter');
 const defaults = ['考研数学', '专业基础', '硬件电路', '英语', 'AI学习'];
 const sort = records => [...records].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 const SOURCE_GUIDES = {
@@ -15,7 +16,12 @@ const SOURCE_GUIDES = {
 };
 
 Page({
-  data: { subject: '考研数学', categories: defaults, source: 'Goodnotes', sources: MATERIAL_SOURCES, title: '', content: '', images: [], files: [], records: [], folders: [], open: {}, activeRecordId: '', focusRecordId: '', touchStartX: 0 },
+  data: {
+    subject: '考研数学', categories: defaults, source: 'Goodnotes', sources: MATERIAL_SOURCES,
+    title: '', content: '', images: [], files: [], records: [], folders: [], open: {}, activeRecordId: '', focusRecordId: '', touchStartX: 0,
+    filter: { keyword: '', subject: '全部', source: '全部', month: '全部' },
+    filterOptions: { subjects: ['全部'], sources: ['全部'], months: ['全部'] }, filtering: false
+  },
   onShow() {
     const categories = wx.getStorageSync('recordCategories') || defaults;
     this.setData({ categories });
@@ -38,7 +44,18 @@ Page({
       source: normalizeMaterialSource(record.source), displayTitle: materialTitle(record), displayDate: formatRecordDate(record.date)
     }));
     wx.setStorageSync('studyRecords', records);
-    this.setData({ records, folders: buildFolders(records, this.data.categories) });
+    this.renderRecords(records);
+  },
+  renderRecords(records) {
+    const visible = filterStudyItems(records, this.data.filter);
+    const months = [...new Set(records.map(item => monthKey(item.date)))].sort().reverse();
+    const filter = this.data.filter;
+    this.setData({
+      records,
+      folders: buildFolders(visible, this.data.categories),
+      filterOptions: { subjects: buildFilterOptions(records, 'subject'), sources: buildFilterOptions(records, 'source'), months: ['全部', ...months] },
+      filtering: Boolean(filter.keyword || filter.subject !== '全部' || filter.source !== '全部' || filter.month !== '全部')
+    });
   },
   persist(records) {
     this.setRecords(records);
@@ -72,6 +89,11 @@ Page({
   },
   input(e) { this.setData({ content: e.detail.value }); },
   inputTitle(e) { this.setData({ title: e.detail.value }); },
+  setFilterKeyword(e) { this.setData({ 'filter.keyword': e.detail.value }, () => this.renderRecords(this.data.records)); },
+  pickFilterSubject(e) { this.setData({ 'filter.subject': e.currentTarget.dataset.value }, () => this.renderRecords(this.data.records)); },
+  pickFilterSource(e) { this.setData({ 'filter.source': e.currentTarget.dataset.value }, () => this.renderRecords(this.data.records)); },
+  pickFilterMonth(e) { this.setData({ 'filter.month': e.currentTarget.dataset.value }, () => this.renderRecords(this.data.records)); },
+  clearFilter() { this.setData({ filter: { keyword: '', subject: '全部', source: '全部', month: '全部' } }, () => this.renderRecords(this.data.records)); },
   chooseImage() { wx.chooseMedia({ count: 3, mediaType: ['image'], success: result => this.setData({ images: [...this.data.images, ...result.tempFiles.map(file => file.tempFilePath)] }) }); },
   chooseFile() { wx.chooseMessageFile({ count: 5, type: 'file', success: result => this.setData({ files: [...this.data.files, ...result.tempFiles] }) }); },
   toggleFolder(e) { const name = e.currentTarget.dataset.n; this.setData({ [`open.${name}`]: !this.data.open[name] }); },

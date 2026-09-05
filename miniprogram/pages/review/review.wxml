@@ -1,21 +1,101 @@
 <view class="page">
-  <view class="card due-card"><view class="coach-title">{{coach.title}}</view><view class="coach-message">{{coach.message}}</view><view class="due-title">今天该复习（{{dueItems.length}}）</view><view wx:if="{{!dueItems.length}}" class="due-empty">今天没有到期复盘，继续保持这个节奏。</view><block wx:else><block wx:for="{{duePreview}}" wx:key="id"><view class="due-item"><view class="due-content">{{item.content}}</view><view class="muted">{{item.type}} · 原定 {{item.next}}</view><button size="mini" data-id="{{item.id}}" bindtap="reviewDue">复习完成</button></view></block><view wx:if="{{dueItems.length > 3}}" class="due-more">还有 {{dueItems.length - 3}} 条待复习，请在下方收藏夹中查看。</view></block></view>
-  <view wx:if="{{curve}}" class="card curve-card"><view class="curve-head"><view><view class="curve-title">记忆保持曲线</view><view class="muted">{{curve.title}}</view></view><text>第 {{curve.stage}} 次</text></view><canvas type="2d" id="review-curve" class="curve-canvas"></canvas><view class="curve-milestones"><view wx:for="{{curve.milestones}}" wx:key="day" class="curve-node {{item.status}}"><view class="node-dot"></view><text>{{item.label}}</text></view></view><view class="muted curve-next">橙色是下一次要复习的节点 · 下次 {{curve.next}}</view></view>
-  <view class="card"><view class="title">艾宾浩斯复习</view><view class="muted">按 1、2、4、7、15、30 天节奏复习。</view><view class="types"><block wx:for="{{categories}}" wx:key="*this"><text class="pill {{type===item?'selected':''}}" data-t="{{item}}" bindtap="pick">{{item}}</text></block><text class="pill new-category" bindtap="addCategory">＋ 新增分类</text></view><textarea class="input note" value="{{content}}" placeholder="写下需要复习的内容……" bindinput="input"/><button class="primary" bindtap="save">加入复习队列</button></view>
+  <view class="card due-card">
+<view class="coach-title">{{coach.title}}</view>
+<view class="coach-message">{{coach.message}}</view>
+<view class="due-title">今天该复习（{{dueItems.length}}）</view>
+<view wx:if="{{!dueItems.length}}" class="due-empty">今天没有到期复盘，继续保持这个节奏。</view>
+<block wx:else>
+<block wx:for="{{duePreview}}" wx:key="id">
+<view class="due-item">
+<view class="due-content">{{item.content}}</view>
+<view class="muted">{{item.type}} · 原定 {{item.next}}</view>
+<button size="mini" data-id="{{item.id}}" bindtap="reviewDue">复习完成</button>
+</view>
+</block>
+<view wx:if="{{dueItems.length > 3}}" class="due-more">还有 {{dueItems.length - 3}} 条待复习，请在下方收藏夹中查看。</view>
+</block>
+</view>
+  <view wx:if="{{curve}}" class="card curve-card">
+<view class="curve-head">
+<view>
+<view class="curve-title">记忆保持曲线</view>
+<view class="muted">{{curve.title}}</view>
+</view>
+<text>第 {{curve.stage}} 次</text>
+</view>
+<canvas type="2d" id="review-curve" class="curve-canvas">
+</canvas>
+<view class="curve-milestones">
+<view wx:for="{{curve.milestones}}" wx:key="day" class="curve-node {{item.status}}">
+<view class="node-dot">
+</view>
+<text>{{item.label}}</text>
+</view>
+</view>
+<view class="muted curve-next">橙色是下一次要复习的节点 · 下次 {{curve.next}}</view>
+</view>
+  <view class="card">
+<view class="title">艾宾浩斯复习</view>
+<view class="muted">按 1、2、4、7、15、30 天节奏复习。</view>
+<view class="types">
+<block wx:for="{{categories}}" wx:key="*this">
+<text class="pill {{type===item?'selected':''}}" data-t="{{item}}" bindtap="pick">{{item}}</text>
+</block>
+<text class="pill new-category" bindtap="addCategory">＋ 新增分类</text>
+</view>
+<textarea class="input note" value="{{content}}" placeholder="写下需要复习的内容……" bindinput="input"/>
+<button class="primary" bindtap="save">加入复习队列</button>
+  </view>
   <view class="section">复盘收藏夹</view>
+  <view class="filter-card">
+    <input value="{{filter.keyword}}" placeholder="搜索复盘内容或来源" bindinput="setFilterKeyword"/>
+    <scroll-view scroll-x class="filter-row"><text wx:for="{{filterOptions.subjects}}" wx:key="*this" class="filter-chip {{filter.subject===item?'active':''}}" data-value="{{item}}" bindtap="pickFilterSubject">{{item}}</text></scroll-view>
+    <scroll-view scroll-x class="filter-row"><text wx:for="{{filterOptions.sources}}" wx:key="*this" class="filter-chip {{filter.source===item?'active':''}}" data-value="{{item}}" bindtap="pickFilterSource">{{item}}</text></scroll-view>
+    <scroll-view scroll-x class="filter-row"><text wx:for="{{filterOptions.months}}" wx:key="*this" class="filter-chip {{filter.month===item?'active':''}}" data-value="{{item}}" bindtap="pickFilterMonth">{{item}}</text></scroll-view>
+    <text class="clear-filter" bindtap="clearFilter">清空筛选</text>
+  </view>
+  <view wx:if="{{filtering && !folders.length && !mastered.length}}" class="card empty">没有匹配的复盘内容。<text class="clear-filter" bindtap="clearFilter">清空筛选</text></view>
   <block wx:for="{{folders}}" wx:key="name">
     <view class="card folder">
-      <view class="folder-head" data-n="{{item.name}}" bindtap="toggleFolder">📁 {{item.name}}（{{item.count}}）<text>{{open[item.name]?'收起':'展开'}}</text></view>
+      <view class="folder-head" data-n="{{item.name}}" bindtap="toggleFolder">📁 {{item.name}}（{{item.count}}）<text>{{open[item.name]?'收起':'展开'}}</text>
+</view>
       <block wx:if="{{open[item.name]}}">
         <block wx:for="{{item.items}}" wx:for-item="review" wx:key="id">
-          <view class="review-item"><view>{{review.content}}</view><text wx:if="{{review.recordId}}" class="related-record" data-id="{{review.recordId}}" bindtap="openRelatedRecord">📎 来自资料卡：{{review.sourceLabel || '其他'}}</text><view class="muted">第 {{review.stage}} 次 · 下次 {{review.next}}</view><view class="buttons"><button size="mini" data-id="{{review.id}}" bindtap="review">复习完成</button><button size="mini" data-id="{{review.id}}" bindtap="showPrompts">举一反三</button><button size="mini" data-id="{{review.id}}" bindtap="done">掌握</button><button size="mini" class="delete-mini" data-id="{{review.id}}" bindtap="remove">删除</button></view><view wx:if="{{activePromptId===review.id}}" class="prompt-box"><view class="prompt-title">离线举一反三</view><block wx:for="{{activePrompts}}" wx:key="*this"><view class="prompt">{{item}}</view></block></view></view>
+          <view class="review-item">
+<view>{{review.content}}</view>
+<text wx:if="{{review.recordId}}" class="related-record" data-id="{{review.recordId}}" bindtap="openRelatedRecord">📎 来自资料卡：{{review.sourceLabel || '其他'}}</text>
+<view class="muted">第 {{review.stage}} 次 · 下次 {{review.next}}</view>
+<view class="buttons">
+<button size="mini" data-id="{{review.id}}" bindtap="review">复习完成</button>
+<button size="mini" data-id="{{review.id}}" bindtap="showPrompts">举一反三</button>
+<button size="mini" data-id="{{review.id}}" bindtap="done">掌握</button>
+<button size="mini" class="delete-mini" data-id="{{review.id}}" bindtap="remove">删除</button>
+</view>
+<view wx:if="{{activePromptId===review.id}}" class="prompt-box">
+<view class="prompt-title">离线举一反三</view>
+<block wx:for="{{activePrompts}}" wx:key="*this">
+<view class="prompt">{{item}}</view>
+</block>
+</view>
+</view>
         </block>
       </block>
     </view>
   </block>
   <view wx:if="{{mastered.length}}" class="section">已复习（{{mastered.length}}）</view>
   <view wx:if="{{mastered.length}}" class="card folder mastered-folder">
-    <view class="folder-head" bindtap="toggleMastered">📁 已复习 <text>{{openMastered?'收起':'展开'}}</text></view>
-    <block wx:if="{{openMastered}}"><block wx:for="{{mastered}}" wx:key="id"><view class="review-item mastered"><view>{{item.content}}</view><text wx:if="{{item.recordId}}" class="related-record" data-id="{{item.recordId}}" bindtap="openRelatedRecord">📎 来自资料卡：{{item.sourceLabel || '其他'}}</text><view class="muted">已掌握 · {{item.masteredAt}}</view><button size="mini" class="undo" data-id="{{item.id}}" bindtap="undoDone">取消掌握</button><button size="mini" class="delete-mini" data-id="{{item.id}}" bindtap="remove">删除</button></view></block></block>
+    <view class="folder-head" bindtap="toggleMastered">📁 已复习 <text>{{openMastered?'收起':'展开'}}</text>
+</view>
+    <block wx:if="{{openMastered}}">
+<block wx:for="{{mastered}}" wx:key="id">
+<view class="review-item mastered">
+<view>{{item.content}}</view>
+<text wx:if="{{item.recordId}}" class="related-record" data-id="{{item.recordId}}" bindtap="openRelatedRecord">📎 来自资料卡：{{item.sourceLabel || '其他'}}</text>
+<view class="muted">已掌握 · {{item.masteredAt}}</view>
+<button size="mini" class="undo" data-id="{{item.id}}" bindtap="undoDone">取消掌握</button>
+<button size="mini" class="delete-mini" data-id="{{item.id}}" bindtap="remove">删除</button>
+</view>
+</block>
+</block>
   </view>
 </view>
