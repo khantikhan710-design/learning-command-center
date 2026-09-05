@@ -28,8 +28,9 @@
                 <text wx:if="{{record.content}}" class="content selectable" user-select>{{record.content}}</text>
                 <text wx:if="{{record.content}}" class="copy-text" data-text="{{record.content}}" catchtap="copyRecordText">复制文字</text>
                 <text class="copy-text" data-id="{{record.id}}" catchtap="createReview">转为复盘</text>
+                <text class="copy-text" data-id="{{record.id}}" catchtap="openRecordActions">管理</text>
                 <view class="thumbs"><image wx:for="{{record.images}}" wx:for-item="image" wx:key="*this" src="{{image}}" mode="aspectFill" data-image="{{image}}" data-images="{{record.images}}" bindtap="previewRecordImage"/></view>
-                <view wx:for="{{record.files}}" wx:for-item="file" wx:key="attachmentId" class="file" data-f="{{file}}" bindtap="fileActions">📎 {{file.name}} · 打开/转发</view>
+                <view wx:for="{{record.files}}" wx:for-item="file" wx:key="attachmentId" class="file" data-f="{{file}}" data-record-id="{{record.id}}" bindtap="fileActions">📎 {{file.name}} · 打开/转发/删除</view>
               </view>
             </view>
             <view wx:if="{{activeRecordId===record.id}}" class="record-actions"><view class="action pin" data-id="{{record.id}}" bindtap="pin">{{record.pinned?'取消置顶':'置顶'}}</view><view class="action delete" data-id="{{record.id}}" bindtap="remove">删除</view></view>

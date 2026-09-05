@@ -4,6 +4,7 @@ const { getPreviewUrls, currentPreviewUrl } = require('../../utils/evidence-link
 const { formatRecordDate } = require('../../utils/date-display');
 const { MATERIAL_SOURCES, normalizeMaterialSource, materialTitle, createReviewDraft } = require('../../utils/study-material-cards');
 const { isCloudPath, saveLocalImages, saveLocalFiles } = require('../../utils/local-attachments');
+const { removeAttachment } = require('../../utils/record-attachments');
 const defaults = ['考研数学', '专业基础', '硬件电路', '英语', 'AI学习'];
 const sort = records => [...records].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 
@@ -58,6 +59,7 @@ Page({
   toggleFolder(e) { const name = e.currentTarget.dataset.n; this.setData({ [`open.${name}`]: !this.data.open[name] }); },
   start(e) { this.setData({ touchStartX: e.touches[0].clientX }); },
   end(e) { const distance = e.changedTouches[0].clientX - this.data.touchStartX; if (distance < -50) this.setData({ activeRecordId: e.currentTarget.dataset.id }); if (distance > 50) this.setData({ activeRecordId: '' }); },
+  openRecordActions(e) { this.setData({ activeRecordId: e.currentTarget.dataset.id }); },
   pin(e) { const id = e.currentTarget.dataset.id; this.persist(this.data.records.map(record => record.id === id ? { ...record, pinned: !record.pinned } : record)); },
   remove(e) { const id = e.currentTarget.dataset.id; wx.showModal({ title: '删除记录？', content: '删除后无法恢复。', success: result => result.confirm && this.persist(this.data.records.filter(record => record.id !== id)) }); },
   save() {
@@ -101,9 +103,14 @@ Page({
   copyRecordText(e) { wx.setClipboardData({ data: e.currentTarget.dataset.text || '', success: () => wx.showToast({ title: '文字已复制', icon: 'success' }) }); },
   fileActions(e) {
     const file = e.currentTarget.dataset.f;
-    wx.showActionSheet({ itemList: ['打开、转发或用其他应用', '复制文件名'], success: result => {
+    const recordId = e.currentTarget.dataset.recordId;
+    wx.showActionSheet({ itemList: ['打开、转发或用其他应用', '复制文件名', '删除这份附件'], success: result => {
       if (result.tapIndex === 0) this.openFile(file);
       if (result.tapIndex === 1) wx.setClipboardData({ data: file.name || '', success: () => wx.showToast({ title: '文件名已复制', icon: 'success' }) });
+      if (result.tapIndex === 2) wx.showModal({
+        title: '删除这份附件？', content: '只删除附件，不删除资料卡正文。', confirmColor: '#e65050',
+        success: confirm => { if (confirm.confirm) this.persist(removeAttachment(this.data.records, recordId, file.attachmentId)); }
+      });
     }});
   },
   openFile(eventOrFile) {

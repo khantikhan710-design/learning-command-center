@@ -4,7 +4,6 @@ function isCloudPath(path) {
 
 function saveLocalPath(path, api = wx) {
   if (typeof path !== 'string' || !path) return Promise.reject(new Error('找不到本机附件'));
-  if (path.startsWith('wxfile://')) return Promise.resolve(path);
   return new Promise((resolve, reject) => {
     api.saveFile({ tempFilePath: path, success: result => resolve(result.savedFilePath), fail: reject });
   });
