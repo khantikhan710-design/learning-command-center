@@ -4,6 +4,7 @@ project.private.config.json
 # Local agent and editor state
 .superpowers/
 .vscode/
+.worktrees/
 
 # Generated output and logs
 node_modules/
