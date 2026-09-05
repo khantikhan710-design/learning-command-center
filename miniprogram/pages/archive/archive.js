@@ -5,14 +5,34 @@ const { buildMonthlyMarkdown } = require('../../utils/obsidian-export');
 const { STORAGE_KEYS, createBackup, parseBackup, summarizeBackup } = require('../../utils/local-backup');
 const { buildFocusDashboard } = require('../../utils/focus-statistics');
 const { getBackupStatus } = require('../../utils/backup-status');
+const { buildWeeklyReview } = require('../../utils/weekly-review');
+const { buildReviewCoach } = require('../../utils/review-coach');
+const { dueReviews } = require('../../utils/review-status');
+const { buildReminderState } = require('../../utils/reminder-state');
+const { KNOWLEDGE_SOURCES } = require('../../utils/knowledge-sources');
 
 Page({
-  data: { folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null, backupStatus: { text: '尚未生成完整备份', needsBackup: true }, weeklyStats: { totalMinutes: 0, daily: [], subjects: [], tasks: [] } },
+  data: {
+    folders: [], open: {}, showRestore: false, backupText: '', backupPreview: null,
+    backupStatus: { text: '尚未生成完整备份', needsBackup: true },
+    weeklyStats: { totalMinutes: 0, daily: [], subjects: [], tasks: [] },
+    weeklyReview: { plan: { total: 0, completed: 0, percent: 0 }, totalMinutes: 0, subjects: [], weakTopics: [], streak: 0 },
+    reminderState: { dueCount: 0, title: '今天没有到期复盘', message: '本机提醒已启用；微信订阅消息待配置。', subscription: '未配置' },
+    knowledgeSources: KNOWLEDGE_SOURCES
+  },
   onShow() {
     const localRecords = wx.getStorageSync('studyRecords') || [];
     const localReviews = wx.getStorageSync('reviewItems') || [];
     const localTasks = wx.getStorageSync('studyTasks') || [];
-    this.setData({ weeklyStats: buildFocusDashboard(wx.getStorageSync('focusSessions') || []), backupStatus: this.readBackupStatus() });
+    const sessions = wx.getStorageSync('focusSessions') || [];
+    const activityDates = wx.getStorageSync('reviewActiveDates') || [];
+    const reviewCoach = buildReviewCoach({ activityDates, dueCount: localReviews.filter(item => !item.mastered).length, reviewCount: localReviews.length });
+    this.setData({
+      weeklyStats: buildFocusDashboard(sessions),
+      weeklyReview: buildWeeklyReview({ tasks: localTasks, sessions, reviews: localReviews, activityDates }),
+      reminderState: buildReminderState({ dueCount: dueReviews(localReviews).length, missedDays: reviewCoach.missedDays }),
+      backupStatus: this.readBackupStatus()
+    });
     this.setEntries(localRecords, localReviews, localTasks);
     Promise.all([cloudStore.loadSnapshot('records'), cloudStore.loadSnapshot('reviews'), cloudStore.loadTaskState()]).then(([records, reviews, taskState]) => {
       const cloudTasks = Array.isArray(taskState) ? taskState : taskState && taskState.tasks;
@@ -43,6 +63,12 @@ Page({
     if (!folder) return;
     const markdown = buildMonthlyMarkdown(folder);
     wx.setClipboardData({ data: markdown, success: () => wx.showToast({ title: 'Obsidian 文本已复制', icon: 'success' }) });
+  },
+  goReview() { wx.switchTab({ url: '/pages/review/review' }); },
+  copySource(e) {
+    const source = this.data.knowledgeSources.find(item => item.id === e.currentTarget.dataset.id);
+    if (!source || !source.url) return wx.showToast({ title: '请通过自己的资料卡补充该来源', icon: 'none' });
+    wx.setClipboardData({ data: source.url, success: () => wx.showToast({ title: '来源链接已复制', icon: 'success' }) });
   },
   readBackupStorage() {
     return STORAGE_KEYS.reduce((storage, key) => {

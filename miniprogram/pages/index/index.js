@@ -4,6 +4,7 @@ const { buildCategoryMenu } = require('../../utils/category-menu');
 const { formatGoalMinutes, goalMinutesFromPicker, goalPickerValue } = require('../../utils/goal-time');
 const { dueReviews, buildDailySummary } = require('../../utils/review-status');
 const { buildReviewCoach } = require('../../utils/review-coach');
+const { buildReminderState } = require('../../utils/reminder-state');
 const { buildDailyPlan } = require('../../utils/daily-plan');
 const { getNextInsight } = require('../../utils/daily-insights');
 const { getTaskDragState } = require('../../utils/task-drag');
@@ -14,7 +15,7 @@ const {
 
 Page({
   data: {
-    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0, reviewCoach: {},
+    tasks: [], pendingTasks: [], completedTasks: [], completed: 0, total: 0, completedMinutes: 0, focusMinutes: 0, goalMinutes: 360, goalLabel: '6 小时', goalPickerOpen: false, goalHourOptions: [], goalMinuteOptions: ['00', '15', '30', '45'], goalPickerValue: [6, 0], progress: 0, streak: 0, dueItems: [], dueReviewCount: 0, reviewCoach: {}, reminderState: { dueCount: 0, title: '', message: '', subscription: '未配置' },
     newTask: '', date: '', activeTaskId: '', touchStartX: 0, draggingTaskId: '', dragTargetId: '', dragOffsetY: 0, categories: DEFAULT_TASK_CATEGORIES, dailyPlan: { plannedMinutes: 0, remainingMinutes: 0, action: {} },
     insight: { type: '学习思考', title: '把注意力放回今天能完成的一步', content: '先完成一轮可验证的练习，再记录卡点。', source: '学习方法摘记' },
     durationOptions: [15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240]
@@ -74,7 +75,8 @@ Page({
     this.setData({
       tasks, pendingTasks: pending, completedTasks: completed, categories, total: tasks.length, completed: completed.length,
       completedMinutes, focusMinutes, goalMinutes, goalLabel: formatGoalMinutes(goalMinutes), goalPickerValue: goalPickerValue(goalMinutes), streak,
-      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100)), dueItems, dueReviewCount: dueItems.length, reviewCoach, dailyPlan
+      progress: Math.min(100, Math.round((focusMinutes / goalMinutes) * 100)), dueItems, dueReviewCount: dueItems.length, reviewCoach,
+      reminderState: buildReminderState({ dueCount: dueItems.length, missedDays: reviewCoach.missedDays }), dailyPlan
     });
   },
 
